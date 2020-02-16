@@ -1,0 +1,6 @@
+lua-build-arm64v8a/
+lua-build-armeabiv7a/
+readline/readline-8.0_arm/
+readline/readline-8.0_arm64/
+ncurses/ncurses-6.1_arm/
+ncurses/ncurses-6.1_arm64/

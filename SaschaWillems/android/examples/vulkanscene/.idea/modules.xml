@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/../../android.iml" filepath="$PROJECT_DIR$/../../android.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../bloom/bloom.iml" filepath="$PROJECT_DIR$/../bloom/bloom.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../computecloth/computecloth.iml" filepath="$PROJECT_DIR$/../computecloth/computecloth.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../computecullandlod/computecullandlod.iml" filepath="$PROJECT_DIR$/../computecullandlod/computecullandlod.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../computeheadless/computeheadless.iml" filepath="$PROJECT_DIR$/../computeheadless/computeheadless.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../computenbody/computenbody.iml" filepath="$PROJECT_DIR$/../computenbody/computenbody.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../computeparticles/computeparticles.iml" filepath="$PROJECT_DIR$/../computeparticles/computeparticles.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../computeraytracing/computeraytracing.iml" filepath="$PROJECT_DIR$/../computeraytracing/computeraytracing.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../computeshader/computeshader.iml" filepath="$PROJECT_DIR$/../computeshader/computeshader.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../conservativeraster/conservativeraster.iml" filepath="$PROJECT_DIR$/../conservativeraster/conservativeraster.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../debugmarker/debugmarker.iml" filepath="$PROJECT_DIR$/../debugmarker/debugmarker.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../deferred/deferred.iml" filepath="$PROJECT_DIR$/../deferred/deferred.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../deferredmultisampling/deferredmultisampling.iml" filepath="$PROJECT_DIR$/../deferredmultisampling/deferredmultisampling.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../deferredshadows/deferredshadows.iml" filepath="$PROJECT_DIR$/../deferredshadows/deferredshadows.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../descriptorsets/descriptorsets.iml" filepath="$PROJECT_DIR$/../descriptorsets/descriptorsets.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../displacement/displacement.iml" filepath="$PROJECT_DIR$/../displacement/displacement.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../distancefieldfonts/distancefieldfonts.iml" filepath="$PROJECT_DIR$/../distancefieldfonts/distancefieldfonts.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../dynamicuniformbuffer/dynamicuniformbuffer.iml" filepath="$PROJECT_DIR$/../dynamicuniformbuffer/dynamicuniformbuffer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../gears/gears.iml" filepath="$PROJECT_DIR$/../gears/gears.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../geometryshader/geometryshader.iml" filepath="$PROJECT_DIR$/../geometryshader/geometryshader.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../hdr/hdr.iml" filepath="$PROJECT_DIR$/../hdr/hdr.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../imgui/imgui.iml" filepath="$PROJECT_DIR$/../imgui/imgui.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../indirectdraw/indirectdraw.iml" filepath="$PROJECT_DIR$/../indirectdraw/indirectdraw.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../inlineuniformblocks/inlineuniformblocks.iml" filepath="$PROJECT_DIR$/../inlineuniformblocks/inlineuniformblocks.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../inputattachments/inputattachments.iml" filepath="$PROJECT_DIR$/../inputattachments/inputattachments.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../instancing/instancing.iml" filepath="$PROJECT_DIR$/../instancing/instancing.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../mesh/mesh.iml" filepath="$PROJECT_DIR$/../mesh/mesh.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../multisampling/multisampling.iml" filepath="$PROJECT_DIR$/../multisampling/multisampling.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../multithreading/multithreading.iml" filepath="$PROJECT_DIR$/../multithreading/multithreading.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../multiview/multiview.iml" filepath="$PROJECT_DIR$/../multiview/multiview.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../negativeviewportheight/negativeviewportheight.iml" filepath="$PROJECT_DIR$/../negativeviewportheight/negativeviewportheight.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../occlusionquery/occlusionquery.iml" filepath="$PROJECT_DIR$/../occlusionquery/occlusionquery.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../offscreen/offscreen.iml" filepath="$PROJECT_DIR$/../offscreen/offscreen.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../parallaxmapping/parallaxmapping.iml" filepath="$PROJECT_DIR$/../parallaxmapping/parallaxmapping.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../particlefire/particlefire.iml" filepath="$PROJECT_DIR$/../particlefire/particlefire.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pbrbasic/pbrbasic.iml" filepath="$PROJECT_DIR$/../pbrbasic/pbrbasic.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pbribl/pbribl.iml" filepath="$PROJECT_DIR$/../pbribl/pbribl.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pbrtexture/pbrtexture.iml" filepath="$PROJECT_DIR$/../pbrtexture/pbrtexture.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pipelines/pipelines.iml" filepath="$PROJECT_DIR$/../pipelines/pipelines.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pipelinestatistics/pipelinestatistics.iml" filepath="$PROJECT_DIR$/../pipelinestatistics/pipelinestatistics.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pushconstants/pushconstants.iml" filepath="$PROJECT_DIR$/../pushconstants/pushconstants.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../pushdescriptors/pushdescriptors.iml" filepath="$PROJECT_DIR$/../pushdescriptors/pushdescriptors.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../radialblur/radialblur.iml" filepath="$PROJECT_DIR$/../radialblur/radialblur.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../renderheadless/renderheadless.iml" filepath="$PROJECT_DIR$/../renderheadless/renderheadless.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../scenerendering/scenerendering.iml" filepath="$PROJECT_DIR$/../scenerendering/scenerendering.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../screenshot/screenshot.iml" filepath="$PROJECT_DIR$/../screenshot/screenshot.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../shadowmapping/shadowmapping.iml" filepath="$PROJECT_DIR$/../shadowmapping/shadowmapping.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../shadowmappingcascade/shadowmappingcascade.iml" filepath="$PROJECT_DIR$/../shadowmappingcascade/shadowmappingcascade.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../shadowmappingomni/shadowmappingomni.iml" filepath="$PROJECT_DIR$/../shadowmappingomni/shadowmappingomni.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../skeletalanimation/skeletalanimation.iml" filepath="$PROJECT_DIR$/../skeletalanimation/skeletalanimation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../specializationconstants/specializationconstants.iml" filepath="$PROJECT_DIR$/../specializationconstants/specializationconstants.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../sphericalenvmapping/sphericalenvmapping.iml" filepath="$PROJECT_DIR$/../sphericalenvmapping/sphericalenvmapping.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../ssao/ssao.iml" filepath="$PROJECT_DIR$/../ssao/ssao.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../stencilbuffer/stencilbuffer.iml" filepath="$PROJECT_DIR$/../stencilbuffer/stencilbuffer.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../subpasses/subpasses.iml" filepath="$PROJECT_DIR$/../subpasses/subpasses.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../terraintessellation/terraintessellation.iml" filepath="$PROJECT_DIR$/../terraintessellation/terraintessellation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../tessellation/tessellation.iml" filepath="$PROJECT_DIR$/../tessellation/tessellation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../textoverlay/textoverlay.iml" filepath="$PROJECT_DIR$/../textoverlay/textoverlay.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../texture/texture.iml" filepath="$PROJECT_DIR$/../texture/texture.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../texture3d/texture3d.iml" filepath="$PROJECT_DIR$/../texture3d/texture3d.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../texturearray/texturearray.iml" filepath="$PROJECT_DIR$/../texturearray/texturearray.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../texturecubemap/texturecubemap.iml" filepath="$PROJECT_DIR$/../texturecubemap/texturecubemap.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../texturemipmapgen/texturemipmapgen.iml" filepath="$PROJECT_DIR$/../texturemipmapgen/texturemipmapgen.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../triangle/triangle.iml" filepath="$PROJECT_DIR$/../triangle/triangle.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../viewportarray/viewportarray.iml" filepath="$PROJECT_DIR$/../viewportarray/viewportarray.iml" />
+      <module fileurl="file://$PROJECT_DIR$/vulkanscene.iml" filepath="$PROJECT_DIR$/vulkanscene.iml" />
+    </modules>
+  </component>
+</project>
