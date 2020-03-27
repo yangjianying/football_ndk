@@ -10,7 +10,17 @@
 
 #if defined(__ANDROID__)
 #include "AAssetManagerImpl_.h"	// frankie, add
+#include <shaderc/shaderc.hpp>  // frankie, add
 #endif
+
+static const char* kTAG = "VulkanTools"; // frankie, add
+
+#include "utils/football_debugger.h"
+
+#undef __CLASS__
+#define __CLASS__ "VulkanTools"
+
+//using namespace vulkan_fn;  // frankie, add
 
 namespace vks
 {
@@ -236,6 +246,76 @@ namespace vks
 			subresourceRange.layerCount = 1;
 			setImageLayout(cmdbuffer, image, oldImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
 		}
+		
+		void setImageLayout_(VkCommandBuffer cmdBuffer, VkImage image,
+							VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
+							VkPipelineStageFlags srcStages, VkPipelineStageFlags destStages) {
+		  VkImageMemoryBarrier imageMemoryBarrier = {
+			  .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			  .pNext = NULL,
+			  .srcAccessMask = 0,
+			  .dstAccessMask = 0,
+			  .oldLayout = oldImageLayout,
+			  .newLayout = newImageLayout,
+			  .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			  .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			  .image = image,
+			  .subresourceRange =
+				  {
+					  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					  .baseMipLevel = 0,
+					  .levelCount = 1,
+					  .baseArrayLayer = 0,
+					  .layerCount = 1,
+				  },
+		  };
+		
+		  switch (oldImageLayout) {
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			  imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			  break;
+		
+			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			  imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			  break;
+		
+			case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			  imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			  break;
+		
+			default:
+			  break;
+		  }
+		
+		  switch (newImageLayout) {
+			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			  imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			  break;
+		
+			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			  imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			  break;
+		
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			  imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			  break;
+		
+			case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			  imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			  break;
+		
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			  imageMemoryBarrier.dstAccessMask =
+				  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			  break;
+		
+			default:
+			  break;
+		  }
+		
+		  vkCmdPipelineBarrier(cmdBuffer, srcStages, destStages, 0, 0, NULL, 0, NULL, 1,
+							   &imageMemoryBarrier);
+		}
 
 		void insertImageMemoryBarrier(
 			VkCommandBuffer cmdbuffer,
@@ -292,7 +372,7 @@ namespace vks
 			std::string fileContent;
 			std::ifstream fileStream(fileName, std::ios::in);
 			if (!fileStream.is_open()) {
-				printf("File %s not found\n", fileName);
+				DLOGD("File %s not found\n", fileName);
 				return "";
 			}
 			std::string line = "";
@@ -330,6 +410,63 @@ namespace vks
 			VK_CHECK_RESULT(vkCreateShaderModule(device, &moduleCreateInfo, NULL, &shaderModule));
 
 			delete[] shaderCode;
+
+			return shaderModule;
+		}
+
+
+		// Translate Vulkan Shader Type to shaderc shader type
+		shaderc_shader_kind getShadercShaderType(VkShaderStageFlagBits type) {
+		  switch (type) {
+			case VK_SHADER_STAGE_VERTEX_BIT:
+			  return shaderc_glsl_vertex_shader;
+			case VK_SHADER_STAGE_FRAGMENT_BIT:
+			  return shaderc_glsl_fragment_shader;
+			case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
+			  return shaderc_glsl_tess_control_shader;
+			case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
+			  return shaderc_glsl_tess_evaluation_shader;
+			case VK_SHADER_STAGE_GEOMETRY_BIT:
+			  return shaderc_glsl_geometry_shader;
+			case VK_SHADER_STAGE_COMPUTE_BIT:
+			  return shaderc_glsl_compute_shader;
+			default:
+			  __android_log_assert("invalid VKShaderStageFlagBits",
+								   kTAG, "type = %08x", type);
+		  }
+		  return static_cast<shaderc_shader_kind>(-1);
+		}
+		VkShaderModule loadShader_from_string(const std::string &source_, VkShaderStageFlagBits type, VkDevice device)
+		{
+			// Load shader from source string
+			size_t glslShaderLen = source_.length();
+			assert(glslShaderLen> 0);
+
+			// compile into spir-V shader
+			shaderc_compiler_t compiler = shaderc_compiler_initialize();
+			shaderc_compilation_result_t spvShader = shaderc_compile_into_spv(
+				compiler, source_.data(), glslShaderLen, getShadercShaderType(type),
+				"shaderc_error", "main", nullptr);
+			if (shaderc_result_get_compilation_status(spvShader) 
+				!= shaderc_compilation_status_success) {
+				DLOGD( "error_message:%s \r\n",
+					shaderc_result_get_error_message(spvShader));
+			}
+			assert(shaderc_result_get_compilation_status(spvShader)
+				== shaderc_compilation_status_success);
+
+			VkShaderModule shaderModule;
+			VkShaderModuleCreateInfo moduleCreateInfo;
+			moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			moduleCreateInfo.pNext = NULL;
+			moduleCreateInfo.codeSize = shaderc_result_get_length(spvShader),
+			moduleCreateInfo.pCode = (const uint32_t*)shaderc_result_get_bytes(spvShader),
+			moduleCreateInfo.flags = 0;
+
+			VK_CHECK_RESULT(vkCreateShaderModule(device, &moduleCreateInfo, NULL, &shaderModule));
+
+			shaderc_result_release(spvShader);
+			shaderc_compiler_release(compiler);
 
 			return shaderModule;
 		}

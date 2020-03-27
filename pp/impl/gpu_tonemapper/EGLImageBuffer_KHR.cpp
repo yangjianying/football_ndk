@@ -16,14 +16,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include <map>
+
+#include "FootballConfig.h"
+
+
 #include "glengine.h"
 
 #include "EGLImageBuffer_KHR.h"
-//#include <cutils/native_handle.h>
-//#include <gralloc_priv.h>
-//#include <ui/GraphicBuffer.h>
-#include <map>
-//#include "EGLImageWrapper.h"
+
+
+#undef __CLASS__
+#define __CLASS__ "EGLImageBuffer_KHR_"
+
 
 //-----------------------------------------------------------------------------
 static EGLImageKHR create_eglImage(const AHardwareBuffer *hardware_buffer)
@@ -54,15 +60,15 @@ static EGLImageKHR create_eglImage(const AHardwareBuffer *hardware_buffer)
 EGLImageBuffer_KHR_::EGLImageBuffer_KHR_(const AHardwareBuffer *hardware_buffer, GLuint ext_texture_id)
 //-----------------------------------------------------------------------------
 {
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
-  // this->graphicBuffer = graphicBuffer;
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
+
   this->eglImageID = create_eglImage(hardware_buffer);
 
  	AHardwareBuffer_Desc desc_ = {0};
 	AHardwareBuffer_describe(hardware_buffer, &desc_);
   this->width = desc_.width; // graphicBuffer->getWidth();
   this->height = desc_.height; // graphicBuffer->getHeight();
-  	fprintf(stderr, "  desc_ size:%4d x %4d \r\n", desc_.width, desc_.height);
+  	DLOGD( "  desc_ size:%4d x %4d \r\n", desc_.width, desc_.height);
 
 	is_ext_texture_id = false;
 	if (ext_texture_id > 0) {
@@ -83,7 +89,7 @@ if (is_ext_texture_id == false) {  // frankie, add
     textureID = 0;
   }
 } else {
-	fprintf(stderr, "%s ext texture not release here !\r\n", __func__);
+	DLOGD( "%s ext texture not release here !\r\n", __func__);
 }
 
   if (renderbufferID != 0) {
@@ -102,7 +108,7 @@ if (is_ext_texture_id == false) {  // frankie, add
       eglDestroyImageKHR(eglGetCurrentDisplay(), eglImageID);
       eglImageID = 0;
   }
-  fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+  DLOGD( "%s,%d \r\n", __func__, __LINE__);
 }
 
 //-----------------------------------------------------------------------------
@@ -189,7 +195,7 @@ void EGLImageBuffer_KHR_::bindAsFramebuffer()
     GLenum result = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (result != GL_FRAMEBUFFER_COMPLETE) {
       //ALOGI("%s Framebuffer Invalid***************", __FUNCTION__);
-      fprintf(stderr, "%s Framebuffer Invalid***************\r\n", __FUNCTION__);
+      DLOGD( "%s Framebuffer Invalid***************\r\n", __FUNCTION__);
     }
   }
 

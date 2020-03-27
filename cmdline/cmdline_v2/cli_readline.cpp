@@ -11,12 +11,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h>
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "utils/football_debugger.h"
+
 //#include <common.h>
 //#include <bootretry.h>
 #include "cli.h"
 //#include <watchdog.h>
 
 //DECLARE_GLOBAL_DATA_PTR;
+
+#undef __CLASS__
+#define __CLASS__ "cli"
+
 
 static const char erase_seq[] = "\b \b";	/* erase sequence */
 static const char   tab_seq[] = "        ";	/* used to expand TABs */
@@ -93,6 +104,8 @@ void hist_::hist_init(void)
 
 void hist_::cread_add_to_hist(char *line)
 {
+	//DLOGD( "%s, hist_add_idx:%d, line:%s\r\n", __func__, hist_add_idx, line);  // frankie, add
+
 	strcpy(hist_list[hist_add_idx], line);
 
 	if (++hist_add_idx >= HIST_MAX)
@@ -267,7 +280,26 @@ int cli::cread_line(const char *const prompt, char *buf, unsigned int *len,
 			first = 0;
 		}
 #endif
+
+		if (mFlags & cli_FLAG_non_blocking_getchar) {
+			// 
+			while(1) {
+				if (is_exit_request()) {
+					//DLOGD( "%s, is_exit_request() == true \r\n", __func__);
+					return 0;
+				}
+				int c_ = getc();
+				if (c_ > 0) {
+					ichar = c_;
+					break;
+				}
+				else {
+					usleep(1000);
+				}
+			}
+		} else {
 		ichar = getcmd_getch();
+		}
 
 		/* ichar=0x0 when error occurs in U-Boot getc */
 		if (!ichar)
@@ -525,7 +557,7 @@ int cli::cli_readline_into_buffer(const char *const prompt, char *buffer,
 #if 1  // #ifdef CONFIG_CMDLINE_EDITING
 	unsigned int len = CONFIG_SYS_CBSIZE;
 	int rc;
-	static int initted;
+	//static int initted;
 
 	/*
 	 * History uses a global array which is not
@@ -534,14 +566,19 @@ int cli::cli_readline_into_buffer(const char *const prompt, char *buffer,
 	 * running from flash.
 	 */
 	if (1) {  // if (gd->flags & GD_FLG_RELOC) {
+
+		/*  move this into constructor
 		if (!initted) {
 			hist->hist_init();
 			initted = 1;
 		}
+		*/
 
-		if (prompt)
-			puts(prompt);
+		//DLOGD( "%s ... prompt:%s \r\n", __func__, prompt);  // frankie, add
 
+		if (prompt) {
+			fprintf(stderr, "%s", prompt); //puts(prompt);		// frankie, note:
+		}
 		rc = cread_line(prompt, p, &len, timeout);
 		return rc < 0 ? rc : len;
 

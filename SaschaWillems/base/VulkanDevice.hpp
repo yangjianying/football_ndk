@@ -17,6 +17,11 @@
 #include "VulkanTools.h"
 #include "VulkanBuffer.hpp"
 
+#include "utils/football_debugger.h"
+
+#undef __CLASS__
+#define __CLASS__ "VulkanDevice"
+
 namespace vks
 {	
 	struct VulkanDevice
@@ -78,7 +83,27 @@ namespace vks
 			assert(queueFamilyCount > 0);
 			queueFamilyProperties.resize(queueFamilyCount);
 			vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilyProperties.data());
-
+{
+			DLOGD( "queueFamilyCount: %d \r\n", queueFamilyCount);
+			for(int i=0;i<queueFamilyCount;i++) {
+				VkQueueFamilyProperties queueFamilyProperty = queueFamilyProperties[i];
+				DLOGD( "  [%2d], queueFlags:0x%08x queueCount:%d timestampValidBits:%d\n"
+					"     minImageTransferGranularity: %4d,%4d,%4d \r\n",
+					i,
+					queueFamilyProperty.queueFlags,
+					queueFamilyProperty.queueCount,
+					queueFamilyProperty.timestampValidBits,
+					queueFamilyProperty.minImageTransferGranularity.width,
+					queueFamilyProperty.minImageTransferGranularity.height,
+					queueFamilyProperty.minImageTransferGranularity.depth
+					);
+			}
+/*
+queueFamilyCount: 1 
+  [ 0], queueFlags:0x00000013 queueCount:3 timestampValidBits:48
+     minImageTransferGranularity:    1,   1,   1 
+*/
+}
 			// Get list of supported extensions
 			uint32_t extCount = 0;
 			vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extCount, nullptr);
@@ -214,7 +239,12 @@ namespace vks
 		*
 		* @return VkResult of the device creation call
 		*/
-		VkResult createLogicalDevice(VkPhysicalDeviceFeatures enabledFeatures, std::vector<const char*> enabledExtensions, void* pNextChain, bool useSwapChain = true, VkQueueFlags requestedQueueTypes = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)
+		VkResult createLogicalDevice(
+			VkPhysicalDeviceFeatures enabledFeatures, 
+			std::vector<const char*> enabledExtensions, 
+			void* pNextChain, 
+			bool useSwapChain = true, 
+			VkQueueFlags requestedQueueTypes = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)
 		{			
 			// Desired queues need to be requested upon logical device creation
 			// Due to differing queue family configurations of Vulkan implementations this can be a bit tricky, especially if the application
@@ -242,6 +272,7 @@ namespace vks
 			{
 				queueFamilyIndices.graphics = VK_NULL_HANDLE;
 			}
+			DLOGD( "* %s, queueFamilyIndices.graphics = %d \r\n", __func__, queueFamilyIndices.graphics);
 
 			// Dedicated compute queue
 			if (requestedQueueTypes & VK_QUEUE_COMPUTE_BIT)
@@ -263,12 +294,14 @@ namespace vks
 				// Else we use the same queue
 				queueFamilyIndices.compute = queueFamilyIndices.graphics;
 			}
+			DLOGD( "* %s, queueFamilyIndices.compute = %d \r\n", __func__, queueFamilyIndices.compute);
 
 			// Dedicated transfer queue
 			if (requestedQueueTypes & VK_QUEUE_TRANSFER_BIT)
 			{
 				queueFamilyIndices.transfer = getQueueFamilyIndex(VK_QUEUE_TRANSFER_BIT);
-				if ((queueFamilyIndices.transfer != queueFamilyIndices.graphics) && (queueFamilyIndices.transfer != queueFamilyIndices.compute))
+				if ((queueFamilyIndices.transfer != queueFamilyIndices.graphics) 
+					&& (queueFamilyIndices.transfer != queueFamilyIndices.compute))
 				{
 					// If compute family index differs, we need an additional queue create info for the compute queue
 					VkDeviceQueueCreateInfo queueInfo{};
@@ -284,6 +317,7 @@ namespace vks
 				// Else we use the same queue
 				queueFamilyIndices.transfer = queueFamilyIndices.graphics;
 			}
+			DLOGD( "* %s, queueFamilyIndices.transfer = %d \r\n", __func__, queueFamilyIndices.transfer);
 
 			// Create the logical device representation
 			std::vector<const char*> deviceExtensions(enabledExtensions);
@@ -347,7 +381,13 @@ namespace vks
 		*
 		* @return VK_SUCCESS if buffer handle and memory have been created and (optionally passed) data has been copied
 		*/
-		VkResult createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, VkDeviceSize size, VkBuffer *buffer, VkDeviceMemory *memory, void *data = nullptr)
+		VkResult createBuffer(
+			VkBufferUsageFlags usageFlags, 
+			VkMemoryPropertyFlags memoryPropertyFlags, 
+			VkDeviceSize size, 
+			VkBuffer *buffer, 
+			VkDeviceMemory *memory, 
+			void *data = nullptr)
 		{
 			// Create the buffer handle
 			VkBufferCreateInfo bufferCreateInfo = vks::initializers::bufferCreateInfo(usageFlags, size);
@@ -398,7 +438,12 @@ namespace vks
 		*
 		* @return VK_SUCCESS if buffer handle and memory have been created and (optionally passed) data has been copied
 		*/
-		VkResult createBuffer(VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, vks::Buffer *buffer, VkDeviceSize size, void *data = nullptr)
+		VkResult createBuffer(
+			VkBufferUsageFlags usageFlags, 
+			VkMemoryPropertyFlags memoryPropertyFlags, 
+			vks::Buffer *buffer, 
+			VkDeviceSize size, 
+			void *data = nullptr)
 		{
 			buffer->device = logicalDevice;
 
@@ -579,7 +624,12 @@ namespace vks
 		VkFormat getSupportedDepthFormat(bool checkSamplingSupport)
 		{
 			// All depth formats may be optional, so we need to find a suitable depth format to use
-			std::vector<VkFormat> depthFormats = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D16_UNORM };
+			std::vector<VkFormat> depthFormats = { 
+				VK_FORMAT_D32_SFLOAT_S8_UINT, 
+				VK_FORMAT_D32_SFLOAT, 
+				VK_FORMAT_D24_UNORM_S8_UINT, 
+				VK_FORMAT_D16_UNORM_S8_UINT, 
+				VK_FORMAT_D16_UNORM };
 			for (auto& format : depthFormats)
 			{
 				VkFormatProperties formatProperties;

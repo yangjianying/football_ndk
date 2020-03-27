@@ -11,6 +11,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h>
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "utils/football_debugger.h"
 
 //#include <common.h>
 #include "cli.h"
@@ -21,6 +27,9 @@
 //#include <malloc.h>
 
 //DECLARE_GLOBAL_DATA_PTR;
+
+#undef __CLASS__
+#define __CLASS__ "cli"
 
 #if 1  // #ifdef CONFIG_CMDLINE
 /*
@@ -135,7 +144,7 @@ int do_run(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 		arg = env_get(argv[i]);
 		if (arg == NULL) {
-			printf("## Error: \"%s\" not defined\n", argv[i]);
+			DLOGD("## Error: \"%s\" not defined\n", argv[i]);
 			return 1;
 		}
 
@@ -182,7 +191,7 @@ void cli_secure_boot_cmd(const char *cmd)
 	int rc;
 
 	if (!cmd) {
-		printf("## Error: Secure boot command not specified\n");
+		DLOGD("## Error: Secure boot command not specified\n");
 		goto err;
 	}
 
@@ -193,7 +202,7 @@ void cli_secure_boot_cmd(const char *cmd)
 #ifdef CONFIG_CMDLINE
 	cmdtp = find_cmd(cmd);
 	if (!cmdtp) {
-		printf("## Error: \"%s\" not defined\n", cmd);
+		DLOGD("## Error: \"%s\" not defined\n", cmd);
 		goto err;
 	}
 
@@ -205,7 +214,7 @@ void cli_secure_boot_cmd(const char *cmd)
 #endif
 
 	/* Shouldn't ever return from boot command. */
-	printf("## Error: \"%s\" returned (code %d)\n", cmd, rc);
+	DLOGD("## Error: \"%s\" returned (code %d)\n", cmd, rc);
 
 err:
 	/*
@@ -216,7 +225,7 @@ err:
 }
 #endif /* CONFIG_IS_ENABLED(OF_CONTROL) */
 
-void cli::cli_loop(void)
+void cli::cli_loop(const char *prompt_)
 {
 //	bootstage_mark(BOOTSTAGE_ID_ENTER_CLI_LOOP);
 #if 0  // #ifdef CONFIG_HUSH_PARSER
@@ -224,9 +233,9 @@ void cli::cli_loop(void)
 	/* This point is never reached */
 	for (;;);
 #elif defined(CONFIG_CMDLINE)
-	cli_simple_loop();
+	cli_simple_loop(prompt_);
 #else
-	printf("## U-Boot command line is disabled. Please enable CONFIG_CMDLINE\n");
+	DLOGD("## U-Boot command line is disabled. Please enable CONFIG_CMDLINE\n");
 #endif /*CONFIG_HUSH_PARSER*/
 }
 
@@ -241,21 +250,42 @@ void cli::cli_init(void)
 #endif
 }
 
-cli::cli() {
+cli::cli(int flags):mFlags(flags) {
+	DLOGD( "cli::%s flags:%08x \r\n", __func__, flags);
+
 	hist = new hist_();
+	hist->hist_init();  // frankie, 2020.03.03 move here
 	cli_init();
 
 	struct termios newt;
 	tcgetattr( STDIN_FILENO, &oldt );
-	newt = oldt;
-	newt.c_lflag &=~(ICANON | ECHO);
-	tcsetattr( STDIN_FILENO, TCSANOW, &newt );
+
+	if ((mFlags & cli_FLAG_no_init_console) == 0) {
+		newt = oldt;
+		newt.c_lflag &=~(ICANON | ECHO);
+		tcsetattr( STDIN_FILENO, TCSANOW, &newt );
+	}
+
+	if (mFlags & cli_FLAG_non_blocking_getchar) {
+		// set STDIN_FILENO non-blocking
+		fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL, 0) | O_NONBLOCK);
+	}
+
 }
 cli::~cli() {
+	DLOGD( "cli::%s \r\n", __func__);
+
 	tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
 		
 	delete hist;
 }
+
+int cli::cli_intercept_command_repeatable(const char *cmd, int flag) {
+	CLI_UNUSED_(cmd);
+	CLI_UNUSED_(flag);
+	return 0;
+}
+
 int cli::cli_cmd_process_(int flag, int argc, char * const argv[],
 			       int *repeatable, ulong *ticks) {
 	CLI_UNUSED_(flag);
@@ -272,16 +302,25 @@ int cli::run_cli_command(const char *command_) {
 	int flag = 0;
 	char lastcommand[CONFIG_SYS_CBSIZE + 1] = { 0 };
 	strlcpy(lastcommand, command_, CONFIG_SYS_CBSIZE + 1);
-	fprintf(stderr, "command_:%s\r\n", command_);
-	fprintf(stderr, "    lastcommand:%s\r\n", lastcommand);
 	int rc = run_command_repeatable(lastcommand, flag);
 	return rc;
+}
+
+int cli::check_cli_command_matched(const char *command_, const char *cmd_) {
+	int flag = 0;
+	char lastcommand[CONFIG_SYS_CBSIZE + 1] = { 0 };
+	strlcpy(lastcommand, command_, CONFIG_SYS_CBSIZE + 1);
+	int rc = cli_simple_check_command(lastcommand, cmd_, flag);
+	if (rc <= 0) {
+		return 0;
+	}
+	return 1;
 }
 
 /* static */ void cli::test() {
 	cli *c = new cli();
 	c->cli_init();
-	c->cli_loop();
+	c->cli_loop("test>>");
 	delete c;
 }
 

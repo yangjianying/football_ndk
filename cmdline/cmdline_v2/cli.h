@@ -7,6 +7,10 @@
 #ifndef __CLI_H
 #define __CLI_H
 
+#include <thread>
+#include <mutex>
+#include <condition_variable>   // NOLINT
+
 #include "cli_predef.h"
 
 
@@ -34,7 +38,14 @@ public:
 };
 class cli {
 public:
-	cli();
+
+	enum {
+		cli_FLAG_none = 0x00,
+		cli_FLAG_intercept_raw = 0x01,
+		cli_FLAG_non_blocking_getchar = 0x02,
+		cli_FLAG_no_init_console = 0x04,
+	};
+	cli(int flags = cli_FLAG_none);
 	virtual ~cli();
 
 int run_command(const char *cmd, int flag);
@@ -48,7 +59,7 @@ int run_command_list(const char *cmd, int len, int flag);
  * This will return if we get a timeout waiting for a command. See
  * CONFIG_BOOT_RETRY_TIME.
  */
-void cli_simple_loop(void);
+void cli_simple_loop(const char *prompt_);
 
 /**
  * cli_simple_run_command() - Execute a command with the simple CLI
@@ -63,6 +74,8 @@ void cli_simple_loop(void);
  *           considered unrecognized)
  */
 int cli_simple_run_command(const char *cmd, int flag);
+
+int cli_simple_check_command(const char *cmd, const char *matched, int flag);
 
 #if 1
 /**
@@ -196,10 +209,12 @@ static inline void cli_secure_boot_cmd(const char *cmd)
  * This will return if we get a timeout waiting for a command, but only for
  * the simple parser (not hush). See CONFIG_BOOT_RETRY_TIME.
  */
-void cli_loop(void);
+void cli_loop(const char *prompt_);
 
 /** Set up the command line interpreter ready for action */
 void cli_init(void);
+
+virtual int cli_intercept_command_repeatable(const char *cmd, int flag);
 
 virtual int cli_cmd_process_(int flag, int argc, char * const argv[],
 			       int *repeatable, ulong *ticks);
@@ -211,7 +226,24 @@ char console_buffer[CONFIG_SYS_CBSIZE + 1];	/* console I/O buffer	*/
 
 struct termios oldt;
 
+int mFlags = 0;
+
+int exit_request_ = 0;
+std::mutex exit_mutex_;
+
+int is_exit_request() {
+	std::unique_lock<std::mutex> caller_lock(exit_mutex_);
+	return exit_request_;
+}
+void set_exit_request(int flag) {
+	std::unique_lock<std::mutex> caller_lock(exit_mutex_);
+	exit_request_ = flag;
+}
+
 int run_cli_command(const char *command_);
+
+int check_cli_command_matched(const char *command_, const char *cmd_);
+
 
 //
 static void test();

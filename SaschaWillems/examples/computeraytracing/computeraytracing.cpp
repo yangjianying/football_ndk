@@ -744,5 +744,5 @@ public:
 
 };
 
-VULKAN_EXAMPLE_MAIN(computeraytracing, "/sdcard/data/SaschaWillems/computeraytracing/assets/")
+VULKAN_EXAMPLE_MAIN(computeraytracing, "SaschaWillems/computeraytracing/assets/")
 	

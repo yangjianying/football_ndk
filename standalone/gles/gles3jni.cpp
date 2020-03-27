@@ -19,7 +19,12 @@
 #include <string.h>
 #include <time.h>
 
+#include "FootballConfig.h"
+
 #include "gles3jni.h"
+
+#undef __CLASS__
+#define __CLASS__ "gles3jni"
 
 const Vertex QUAD[4] = {
     // Square with diagonal < 2 so that it fits in a [-1 .. 1]^2 square

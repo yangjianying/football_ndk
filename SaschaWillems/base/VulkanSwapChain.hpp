@@ -76,6 +76,30 @@ public:
 	/** @brief Queue family index of the detected graphics and presenting device queue */
 	uint32_t queueNodeIndex = UINT32_MAX;
 
+	/**
+	* Set instance, physical and logical device to use for the swapchain and get all required function pointers
+	* 
+	* @param instance Vulkan instance to use
+	* @param physicalDevice Physical device used to query properties and formats relevant to the swapchain
+	* @param device Logical representation of the device to create the swapchain for
+	*
+	*/
+	void connect(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device)
+	{
+		this->instance = instance;
+		this->physicalDevice = physicalDevice;
+		this->device = device;
+		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfaceSupportKHR);
+		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfaceCapabilitiesKHR);
+		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfaceFormatsKHR);
+		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfacePresentModesKHR);
+		GET_DEVICE_PROC_ADDR(device, CreateSwapchainKHR);
+		GET_DEVICE_PROC_ADDR(device, DestroySwapchainKHR);
+		GET_DEVICE_PROC_ADDR(device, GetSwapchainImagesKHR);
+		GET_DEVICE_PROC_ADDR(device, AcquireNextImageKHR);
+		GET_DEVICE_PROC_ADDR(device, QueuePresentKHR);
+	}
+
 	/** @brief Creates the platform specific surface abstraction of the native platform window used for presentation */	
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
 	void initSurface(void* platformHandle, void* platformWindow)
@@ -139,6 +163,9 @@ public:
 			vks::tools::exitFatal("Could not create surface!", err);
 		}
 
+{
+// frankie, note, find a queueFamilyIndex that support present surface into 
+// 	(which index should be equal to queueFamilyIndex that support graphics !!!)
 		// Get available queue family properties
 		uint32_t queueCount;
 		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueCount, NULL);
@@ -204,7 +231,8 @@ public:
 		}
 
 		queueNodeIndex = graphicsQueueNodeIndex;
-
+		DLOGD( "* %s, queueNodeIndex = %d \r\n", __func__, queueNodeIndex);
+}
 		// Get list of supported surface formats
 		uint32_t formatCount;
 		VK_CHECK_RESULT(fpGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, NULL));
@@ -245,30 +273,6 @@ public:
 			}
 		}
 
-	}
-
-	/**
-	* Set instance, physical and logical device to use for the swapchain and get all required function pointers
-	* 
-	* @param instance Vulkan instance to use
-	* @param physicalDevice Physical device used to query properties and formats relevant to the swapchain
-	* @param device Logical representation of the device to create the swapchain for
-	*
-	*/
-	void connect(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device)
-	{
-		this->instance = instance;
-		this->physicalDevice = physicalDevice;
-		this->device = device;
-		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfaceSupportKHR);
-		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfaceCapabilitiesKHR);
-		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfaceFormatsKHR);
-		GET_INSTANCE_PROC_ADDR(instance, GetPhysicalDeviceSurfacePresentModesKHR);
-		GET_DEVICE_PROC_ADDR(device, CreateSwapchainKHR);
-		GET_DEVICE_PROC_ADDR(device, DestroySwapchainKHR);
-		GET_DEVICE_PROC_ADDR(device, GetSwapchainImagesKHR);
-		GET_DEVICE_PROC_ADDR(device, AcquireNextImageKHR);
-		GET_DEVICE_PROC_ADDR(device, QueuePresentKHR);
 	}
 
 	/** 
@@ -414,10 +418,11 @@ public:
 			fpDestroySwapchainKHR(device, oldSwapchain, nullptr);
 		}
 		VK_CHECK_RESULT(fpGetSwapchainImagesKHR(device, swapChain, &imageCount, NULL));
-
 		// Get the swap chain images
 		images.resize(imageCount);
 		VK_CHECK_RESULT(fpGetSwapchainImagesKHR(device, swapChain, &imageCount, images.data()));
+
+		DLOGD( "VulkanSwapChain::%s imageCount = %d \r\n", __func__, imageCount);
 
 		// Get the swap chain buffers containing the image and imageview
 		buffers.resize(imageCount);

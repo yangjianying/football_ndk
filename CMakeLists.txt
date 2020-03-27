@@ -37,11 +37,6 @@ endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-#	-std=c++11 \
-#	-fno-rtti \
-#	-fno-exceptions \
-#	-Wall")
 
 if (${ANDROID_PLATFORM_LEVEL} LESS 12)
   message(FATAL_ERROR "OpenGL 2 is not supported before API level 11 \
@@ -57,9 +52,16 @@ else ()
   set(OPENGL_LIB GLESv3)
 endif (${ANDROID_PLATFORM_LEVEL} LESS 12)
 
+if (${ANDROID_PLATFORM_LEVEL} GREATER 28)
+  set(BINDER_NDK_LIB binder_ndk)
+else ()
+  set(BINDER_NDK_LIB android)
+endif (${ANDROID_PLATFORM_LEVEL} GREATER 28)
+
 message(STATUS ANDROID_PLATFORM_LEVEL = ${ANDROID_PLATFORM_LEVEL})
 message(STATUS CMAKE_SOURCE_DIR = ${CMAKE_SOURCE_DIR})
 message(STATUS __ANDROID_API__ = ${__ANDROID_API__})
+message(STATUS BINDER_NDK_LIB = ${BINDER_NDK_LIB})
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR})
 set(SRC_dir_app_standalone ${SRC_DIR}/standalone)
@@ -85,24 +87,27 @@ endif()
 
 message(STATUS READLINE_INSTALL_DIR = ${READLINE_INSTALL_DIR})
 
-# -Werror \
-# -Wno-unused-variable \
-# -Wno-delete-non-virtual-dtor \
+
+# -std=c++14
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-       -std=c++14 \
+       -std=c++17 \
        -fexceptions \
        -fcxx-exceptions \
-       -Wall \
-       -DVK_USE_PLATFORM_ANDROID_KHR")
+	-DVK_USE_PLATFORM_ANDROID_KHR -DVK_NO_PROTOTYPES")
 
 # -Wunreachable-code
+# -Werror
+# -Wno-unused-variable
+# -Wno-delete-non-virtual-dtor
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
 	-Wall \
 	-Werror \
-    -Wthread-safety \
-    -Wunused \
-    -Wunreachable-code \
-    -Wno-unused-parameter \
+	-Wthread-safety \
+	-Wunused \
+	-Wunreachable-code \
+	-Wno-unused-parameter \
 	-Wno-unused-function \
 	-Wno-unused-variable \
 	-Wno-unreachable-code \
@@ -120,20 +125,37 @@ endif()
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_onCreate")
 
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u test_football_main")
+
+if (${ANDROID_PLATFORM_LEVEL} GREATER 28)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSING_binder_ndk")
+endif (${ANDROID_PLATFORM_LEVEL} GREATER 28)
+
+#add_definitions(-fvisibility=hidden -fvisibility-inlines-hidden)
+
+add_definitions(-fvisibility=default -fvisibility-inlines-hidden)
+
 #///////////////////////////////////////////////////////////////////////
 # build native_app_glue as a static lib
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -DVK_USE_PLATFORM_ANDROID_KHR -DVK_NO_PROTOTYPES")
 
 add_library(native-app-glue STATIC ${ANDROID_NDK}/sources/android/native_app_glue/android_native_app_glue.c)
 
 
+#///////////////////////////////////////////////////////////////////////
+add_library(libshaderc STATIC IMPORTED)
+set_target_properties(libshaderc PROPERTIES
+        IMPORTED_LOCATION ${ANDROID_NDK}/sources/third_party/shaderc/libs/c++_static/${ANDROID_ABI}/libshaderc.a)
+
+#///////////////////////////////////////////////////////////////////////
 # (source_dir binary_dir)
 add_subdirectory(SaschaWillems/android/examples/base SaschaWillems/android/examples/base)
+
 add_subdirectory(${SRC_DIR_SaschaWillems}/android/examples/computeshader_foot ${SRC_DIR_SaschaWillems}/android/examples/computeshader_foot)
 add_subdirectory(${SRC_DIR_SaschaWillems}/android/examples/vulkanscene ${SRC_DIR_SaschaWillems}/android/examples/vulkanscene)
 add_subdirectory(${SRC_DIR_SaschaWillems}/android/examples/computeparticles ${SRC_DIR_SaschaWillems}/android/examples/computeparticles)
 add_subdirectory(${SRC_DIR_SaschaWillems}/android/examples/computeraytracing ${SRC_DIR_SaschaWillems}/android/examples/computeraytracing)
+
 add_subdirectory(${SRC_dir_app_standalone}/SaschaWillems/computedemo1 ${SRC_dir_app_standalone}/SaschaWillems/computedemo1)
 
 
@@ -145,11 +167,6 @@ target_link_libraries(sfhookerapi
 		log
 		)
 
-#///////////////////////////////////////////////////////////////////////
-add_library(libshaderc STATIC IMPORTED)
-set_target_properties(libshaderc PROPERTIES
-
-        IMPORTED_LOCATION ${ANDROID_NDK}/sources/third_party/shaderc/libs/c++_static/${ANDROID_ABI}/libshaderc.a)
 #
 add_library(libncurses STATIC IMPORTED)
 set_target_properties(libncurses PROPERTIES
@@ -169,7 +186,7 @@ add_library(libluajit STATIC IMPORTED)
 set_target_properties(libluajit PROPERTIES
         IMPORTED_LOCATION ${LUA_BUILD_DIR}/libluajit.a)
 
-add_executable(football_service
+set(FOOTBALL_STATIC_SRC
 	cmdline/cmdline_v1/MenuV1.cpp
 	cmdline/cmdline_v1/linktable.c
 	cmdline/cmdline_v1/CmdlineV1.cpp
@@ -179,55 +196,67 @@ add_executable(football_service
 	cmdline/cmdline_v2/cli_simple.cpp
 	cmdline/cmdline_v2/CmdlineV2.cpp
 	cmdline/cmdline_lua/CmdlineLuaImpl.cpp
+	cmdline/cmdline_v2/CmdlineV3.cpp
 	cmdline/CmdLineUtils.cpp
 	cmdline/CmdLineFactory.cpp
-	
-	ndk_extend/NativeHooApiLoader.cpp
-	
-	pp/impl/FootballPPCpu.cpp
 
+	utils/debug_handler.cpp
+	utils/football_debugger.cpp
+	utils/foot_utils.cpp
+	utils/MemTrace.cpp
+	utils/ANativeWindowUtils.cpp
+	utils/StbImage_.cpp
+
+	ndk_extend/NativeHooApi_Loader.cpp
+	ndk_extend/NativeFootballReceiver_Loader.cpp
+	ndk_extend/NativeServiceFootball_Loader.cpp
+	ndk_extend/TestService_Loader.cpp
+
+	pp/impl/FootballPPUtils.cpp
+	pp/impl/FootballPPCpu.cpp
 	pp/impl/gpu_tonemapper/EGLImageBuffer_KHR.cpp
 	pp/impl/gpu_tonemapper/glengine.cpp
 	pp/impl/screenrecord/EglWindow.cpp
 	pp/impl/screenrecord/Program.cpp
 	pp/impl/screenrecord/TextRenderer.cpp
+	pp/impl/FootSessionGlesImpl1.cpp
 	pp/impl/FootballPPGles.cpp
-	
 	pp/impl/FootballPPVk.cpp
-
 	pp/FootballPPFactory.cpp
 	pp/FootballPPTester.cpp
 
 	miniled/Mbi6322Fb.cpp
 	miniled/TestCmdMiniLed.cpp
-	
-    ${SRC_dir_app_standalone}/AAssetManagerImpl_.cpp
-    ${SRC_dir_app_standalone}/native_app_glue.c
-    ${SRC_dir_app_standalone}/ImageReaderHolder.cpp
-    ${SRC_dir_app_standalone}/StbImageUtils.cpp
-    ${SRC_dir_app_standalone}/standalone_main.cpp
-    
-    ${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/vulkan_wrapper.cpp
-    ${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/CreateShaderModule_.cpp
-    ${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/VulkanMain_.cpp
-    ${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/android_main_vk_.cpp
-    
-    ${SRC_dir_app_standalone}/gles/GlesMain.cpp
-    ${SRC_dir_app_standalone}/gles/gles3jni.cpp
-    ${SRC_dir_app_standalone}/gles/RendererES2.cpp
-    ${SRC_dir_app_standalone}/gles/RendererES3.cpp
-    ${SRC_dir_app_standalone}/gles/android_main_gles.cpp
 
-	MemTrace.cpp
-	ANativeWindowUtils.cpp
-	StbImage_.cpp
+	${SRC_dir_app_standalone}/AAssetManagerImpl_.cpp
+	${SRC_dir_app_standalone}/native_app_glue.c
+	${SRC_dir_app_standalone}/ImageReaderHolder.cpp
+	${SRC_dir_app_standalone}/StbImageUtils.cpp
+	${SRC_dir_app_standalone}/standalone_main.cpp
+
+	${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/vulkan_wrapper.cpp
+	${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/CreateShaderModule_.cpp
+	${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/VulkanMain_.cpp
+	${SRC_dir_app_standalone}/android-vulkan-tutorials/tutorial06_texture_v2/android_main_vk_.cpp
+
+	${SRC_dir_app_standalone}/gles/GlesMain.cpp
+	${SRC_dir_app_standalone}/gles/gles3jni.cpp
+	${SRC_dir_app_standalone}/gles/RendererES2.cpp
+	${SRC_dir_app_standalone}/gles/RendererES3.cpp
+	${SRC_dir_app_standalone}/gles/android_main_gles.cpp
+
+	sys_api/FootballSysApi.cpp
+
+	binder/BinderTest.cpp
+
+	FootballConfig.cpp
 
 	TestCmdline.cpp
-	TestFootballMain.cpp
+	TestCmdline_test.cpp
 	)
-
-target_include_directories(football_service PRIVATE 
+set(FOOTBALL_STATIC_INC
 	.
+	utils/
 	external/
 	external/stb
 	${LUA_DIR}/src
@@ -239,36 +268,73 @@ target_include_directories(football_service PRIVATE
 	${SRC_dir_app_standalone}/SaschaWillems/computedemo1
 	)
 
-# native_glue
-# sfhookerapi
-# binder_ndk
-target_link_libraries(football_service
-            android
-            log
-            m
-            z
-            ${OPENGL_LIB}
-            EGL
-            nativewindow
-            mediandk
-            libshaderc
-            
-            libluajit
-            libhistory
-            libreadline
-            #termcap  ## cannot find -ltermcap
-            #tinfo  ## cannot find -ltinfo
-            libncurses
+# binder_ndk should >= 29
+set(FOOTBALL_STATIC_LIBS
+	android
+        log
+        m
+        z
+        ${OPENGL_LIB}
+        EGL
+        nativewindow
+        mediandk
+        ${BINDER_NDK_LIB}
+        libshaderc
+        libluajit
+        libhistory
+        libreadline
+ #       termcap  ## cannot find -ltermcap
+ #       tinfo  ## cannot find -ltinfo
+        libncurses
+        native-app-glue
+        base_static
+        computeshader_foot_static
+ #       vulkanscene_static
+ #       computeparticles_static
+ #       computeraytracing_static
+        computedemo1_static
+        )
 
-            native-app-glue
+add_library(football_static STATIC
+	${FOOTBALL_STATIC_SRC}
+	)
+target_include_directories(football_static PRIVATE 
+	${FOOTBALL_STATIC_INC}
+	)
+target_link_libraries(football_static
+	${FOOTBALL_STATIC_LIBS}
+        )
+set_target_properties(football_static PROPERTIES 
+	ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
-            base_static
-            computeshader_foot_static
-            #vulkanscene_static
-            #computeparticles_static
-            #computeraytracing_static
-            computedemo1_static
-            )
 
 #///////////////////////////////////////////////////////////////////////
+# pack static lib as a shared lib, then can be dlopen by sfhookerapi.so
 
+add_library(football_shared SHARED
+	football_shared.cpp
+	)
+target_include_directories(football_shared PRIVATE 
+	.
+	${ANDROID_NDK}/sources/android/native_app_glue
+	)
+# ${FOOTBALL_STATIC_LIBS} does not contained in football_static
+target_link_libraries(football_shared
+        ${FOOTBALL_STATIC_LIBS}
+	)
+add_dependencies(football_shared football_static)
+set_target_properties(football_shared PROPERTIES 
+    LINK_FLAGS "-Llib -Wl,--whole-archive,-lfootball_static,--no-whole-archive")
+
+
+#///////////////////////////////////////////////////////////////////////
+add_executable(footballd
+	footballd.cpp
+	)
+target_include_directories(footballd PRIVATE 
+	.
+	./utils
+	)
+target_link_libraries(footballd
+	football_shared
+	)

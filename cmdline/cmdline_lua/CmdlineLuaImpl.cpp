@@ -22,13 +22,12 @@ CmdlineLuaImpl::~CmdlineLuaImpl() {
 }
 	// prompt is set by CONFIG_SYS_PROMPT macro !!!
 void CmdlineLuaImpl::setPrompt(const char *prompt) {
-
 }
-void CmdlineLuaImpl::addEmptyCmdCallback(PF_empty_cmd_cb cb, void *ctx) {
-
+void CmdlineLuaImpl::add_on_empty_cmd(PF_on_empty_cmd cb, void *ctx) {
 }
-void CmdlineLuaImpl::onEmptyCmd() {
-
+void CmdlineLuaImpl::add_on_intercept_command(PF_on_intercept_command, void *ctx) {
+}
+void CmdlineLuaImpl::on_empty_cmd_i() {
 }
 int CmdlineLuaImpl::add(
 	const char * cmd, const char * desc, int (*handler)(void *, int, char * const *), void *ctx) {
@@ -38,6 +37,12 @@ int CmdlineLuaImpl::add(
 int CmdlineLuaImpl::loop() {
 
 	return 0;
+}
+int CmdlineLuaImpl::check_command_matched(const char * cmd, const char *matched_) {
+	return 0;
+}
+int CmdlineLuaImpl::postCommand(const char * cmd) {
+	return -1;
 }
 int CmdlineLuaImpl::runCommand(const char * cmd) {
 

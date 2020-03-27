@@ -73,11 +73,14 @@ extern PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges;
 extern PFN_vkInvalidateMappedMemoryRanges vkInvalidateMappedMemoryRanges;
 extern PFN_vkBindBufferMemory vkBindBufferMemory;
 extern PFN_vkDestroyBuffer vkDestroyBuffer;
+extern PFN_vkCreateBufferView vkCreateBufferView;  // frankie, add
+extern PFN_vkDestroyBufferView vkDestroyBufferView; // frankie, add
 extern PFN_vkAllocateMemory vkAllocateMemory;
 extern PFN_vkBindImageMemory vkBindImageMemory;
 extern PFN_vkGetImageSubresourceLayout vkGetImageSubresourceLayout;
 extern PFN_vkCmdCopyBuffer vkCmdCopyBuffer;
 extern PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
+extern PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
 extern PFN_vkCmdCopyImage vkCmdCopyImage;
 extern PFN_vkCmdBlitImage vkCmdBlitImage;
 extern PFN_vkCmdClearAttachments vkCmdClearAttachments;
@@ -151,8 +154,27 @@ extern PFN_vkCmdEndQuery vkCmdEndQuery;
 extern PFN_vkCmdResetQueryPool vkCmdResetQueryPool;
 extern PFN_vkCmdCopyQueryPoolResults vkCmdCopyQueryPoolResults;
 
-extern PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR;
 extern PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR;
+extern PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
+extern PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
+extern PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormatsKHR;
+extern PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR;
+
+// VK_KHR_swapchain
+extern PFN_vkCreateSwapchainKHR vkCreateSwapchainKHR;
+extern PFN_vkDestroySwapchainKHR vkDestroySwapchainKHR;
+extern PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR;
+extern PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
+extern PFN_vkQueuePresentKHR vkQueuePresentKHR;
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+// VK_KHR_android_surface
+extern PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR;
+extern PFN_vkGetAndroidHardwareBufferPropertiesANDROID vkGetAndroidHardwareBufferPropertiesANDROID;
+extern PFN_vkGetMemoryAndroidHardwareBufferANDROID vkGetMemoryAndroidHardwareBufferANDROID;
+#endif
+
+
 
 namespace vks
 {
@@ -172,6 +194,8 @@ namespace vks
 		void freeVulkanLibrary();
 		void getDeviceConfig();
 		void showAlert(const char* message);
+
+		void print_VkFormatFeatureFlags(VkFormatFeatureFlags flags);
 	}
 }
 

@@ -670,4 +670,4 @@ public:
 
 };
 
-VULKAN_EXAMPLE_MAIN(computeparticles, "/sdcard/data/SaschaWillems/computeparticles/assets/")
+VULKAN_EXAMPLE_MAIN(computeparticles, "SaschaWillems/computeparticles/assets/")

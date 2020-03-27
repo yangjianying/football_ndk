@@ -16,11 +16,16 @@
 #include <stdint.h>
 #include <string>
 
+#include "FootballConfig.h"
+
 #include "MemTrace.h"
 #include "StbImage_.h"
 
 #include "FootballPPCpu.h"
+#include "FootballPPTester.h"
 
+#undef __CLASS__
+#define __CLASS__ "FootballPPCpu"
 
 namespace football {
 
@@ -45,16 +50,16 @@ static int32_t createDirectory(const std::string &directoryPath) {
         tmpDirPath[i] = directoryPath[i];
         if (tmpDirPath[i] == '\\' || tmpDirPath[i] == '/') {
             if (ACCESS(tmpDirPath, 0) != 0) {
-				fprintf(stderr, "createDirectory:%s \r\n", tmpDirPath);
+				DLOGD( "createDirectory:%s \r\n", tmpDirPath);
                 int32_t ret = MKDIR(tmpDirPath);
                 if (ret != 0) {
-					fprintf(stderr, "%s,%d error! \r\n", __func__, __LINE__);
+					DLOGD( "%s,%d error! \r\n", __func__, __LINE__);
                     return ret;
                 }
             }
         }
     }
-	fprintf(stderr, "%s ok! \r\n", __func__);
+	DLOGD( "%s ok! \r\n", __func__);
     return 0;
 }
 
@@ -105,14 +110,14 @@ static void print_block_data(long *buf, int w_, int h_) {
 	for(int line = 0; line < h_; line++) {
 		for(uint32_t i = 0; i < w_; i++ ) {
 			line_end = 0;
-			fprintf(stderr, "%4ld ", buf[line*w_ + i]);
+			DLOGD( "%4ld ", buf[line*w_ + i]);
 			if(i % line_num == (line_num - 1)) {
 				line_end = 1;
-				fprintf(stderr, "\r\n");
+				DLOGD( "\r\n");
 			}
 		}
 		if (line_end == 0) {
-			fprintf(stderr, "\r\n");
+			DLOGD( "\r\n");
 		}
 	}
 }
@@ -122,14 +127,14 @@ static void print_block_data(int *buf, int w_, int h_) {
 	for(int line = 0; line < h_; line++) {
 		for(uint32_t i = 0; i < w_; i++ ) {
 			line_end = 0;
-			fprintf(stderr, "%4d ", buf[line*w_ + i]);
+			DLOGD( "%4d ", buf[line*w_ + i]);
 			if(i % line_num == (line_num - 1)) {
 				line_end = 1;
-				fprintf(stderr, "\r\n");
+				DLOGD( "\r\n");
 			}
 		}
 		if (line_end == 0) {
-			fprintf(stderr, "\r\n");
+			DLOGD( "\r\n");
 		}
 	}
 }
@@ -139,14 +144,14 @@ static void print_block_data(double *buf, int w_, int h_) {
 	for(int line = 0; line < h_; line++) {
 		for(uint32_t i = 0; i < w_; i++ ) {
 			line_end = 0;
-			fprintf(stderr, "%2.5f ", buf[line*w_ + i]);
+			DLOGD( "%2.5f ", buf[line*w_ + i]);
 			if(i % line_num == (line_num - 1)) {
 				line_end = 1;
-				fprintf(stderr, "\r\n");
+				DLOGD( "\r\n");
 			}
 		}
 		if (line_end == 0) {
-			fprintf(stderr, "\r\n");
+			DLOGD( "\r\n");
 		}
 	}
 }
@@ -156,39 +161,29 @@ static void print_block_data(int *buf, int w_, int h_, int x, int y, int width, 
 	for(int line = y; line < h_ && line < (y + height); line++) {
 		for(uint32_t i = x; i < w_ && i < (x + width); i++ ) {
 			line_end = 0;
-			fprintf(stderr, "%4d ", buf[line*w_ + i]);
+			DLOGD( "%4d ", buf[line*w_ + i]);
 			if(i % line_num == (line_num - 1)) {
 				line_end = 1;
-				fprintf(stderr, "\r\n");
+				DLOGD( "\r\n");
 			}
 		}
 		if (line_end == 0) {
-			fprintf(stderr, "\r\n");
+			DLOGD( "\r\n");
 		}
 	}
 }
 
+FootballPPCpu::FootSessionCpu::FootSessionCpu(SessionInfo &session):
+	ImageReaderImageListenerWrapper()
+		, mSessionInfo(session)
+		, mTestColorGenerator(new TestColorGenerator()) {
 
-/*static*/ int FootballPPCpu::s_SessionId_generator = 0;
-
-/*static*/ void FootballPPCpu::FootSessionCpu::s_AImageReader_ImageCallback(void* context, AImageReader* reader) {
-	if (context != nullptr) {
-		FootSessionCpu *session_cpu = (FootSessionCpu*)context;
-		session_cpu->onImageAvailableCallback(reader);
-	}
-}
-FootballPPCpu::FootSessionCpu::FootSessionCpu(FootSession *session):
-	mFootSession(*session)
-	, mTestColorGenerator(new TestColorGenerator()) {
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	::football::MemTrace::print();
 
-	// setup AImageReader_ImageListener
-	context = (void *)this; onImageAvailable = s_AImageReader_ImageCallback;
-
-	if (session->final_image == nullptr
-		|| session->backlight_data == nullptr) {
-		fprintf(stderr, "%s,%d error\r\n", __func__, __LINE__);
+	if (mSessionInfo.final_image == nullptr
+		|| mSessionInfo.backlight_data == nullptr) {
+		DLOGD( "%s,%d error\r\n", __func__, __LINE__);
 		return ;
 	}
 	int32_t width_ = 0;
@@ -196,54 +191,50 @@ FootballPPCpu::FootSessionCpu::FootSessionCpu(FootSession *session):
 	int32_t format_ = 0;
 	int32_t maxImages_ = 0;
 
-	width_ = ANativeWindow_getWidth(session->final_image);
-	height_ = ANativeWindow_getHeight(session->final_image);
-	format_ = ANativeWindow_getFormat(session->final_image);
-	if (session->width != width_) {
-		mFootSession.width = width_;
+	width_ = ANativeWindow_getWidth(mSessionInfo.final_image);
+	height_ = ANativeWindow_getHeight(mSessionInfo.final_image);
+	format_ = ANativeWindow_getFormat(mSessionInfo.final_image);
+	if (mSessionInfo.width != width_) {
+		mSessionInfo.width = width_;
 	}
-	if (session->height != height_) {
-		mFootSession.height = height_;
+	if (mSessionInfo.height != height_) {
+		mSessionInfo.height = height_;
 	}
-	if (session->format != format_) {
-		mFootSession.format = format_;
-		mFootSession.format = AIMAGE_FORMAT_RGBA_8888;
-	}
-
-	width_ = ANativeWindow_getWidth(session->backlight_data);
-	height_ = ANativeWindow_getHeight(session->backlight_data);
-	format_ = ANativeWindow_getFormat(session->backlight_data);
-	if (session->bl_width != width_) {
-		mFootSession.bl_width = width_; 
-	}
-	if (session->bl_height != height_) {
-		mFootSession.bl_height = height_; 
-	}
-	if (session->bl_format != format_) {
-		mFootSession.bl_format = format_; 
+	if (mSessionInfo.format != format_) {
+		mSessionInfo.format = format_;
+		mSessionInfo.format = AIMAGE_FORMAT_RGBA_8888;
 	}
 
-	AImageReader *reader_ = nullptr;
-	media_status_t ret = AImageReader_new(mFootSession.width, mFootSession.height, mFootSession.format, 3, &reader_);
-	if (ret == AMEDIA_OK && reader_ != nullptr) {
-		mReader = reader_;
-		AImageReader_setImageListener(mReader, this);
-	
-		AImageReader_getWidth(reader_, &width_);
-		AImageReader_getHeight(reader_, &height_);
-		AImageReader_getFormat(reader_, &format_);
-		AImageReader_getMaxImages(reader_, &maxImages_);
-		
-		ANativeWindow *window_ = nullptr;
-		ret = AImageReader_getWindow(reader_, &window_);
-		if (ret == AMEDIA_OK && window_ != nullptr) {
-			mFootSession.input_window = window_;
-			session->input_window = mFootSession.input_window;
-		}
+	width_ = ANativeWindow_getWidth(mSessionInfo.backlight_data);
+	height_ = ANativeWindow_getHeight(mSessionInfo.backlight_data);
+	format_ = ANativeWindow_getFormat(mSessionInfo.backlight_data);
+	if (mSessionInfo.bl_width != width_) {
+		mSessionInfo.bl_width = width_; 
 	}
-	fprintf(stderr, "# session window size: %04d x %04d format:%08x / bl data size:%04d x %04d format:%08x \r\n", 
-		mFootSession.width, mFootSession.height, mFootSession.format,
-		mFootSession.bl_width, mFootSession.bl_height, mFootSession.bl_format);
+	if (mSessionInfo.bl_height != height_) {
+		mSessionInfo.bl_height = height_; 
+	}
+	if (mSessionInfo.bl_format != format_) {
+		mSessionInfo.bl_format = format_; 
+	}
+
+#if 1
+{
+	mHardwareBufferReader = new HardwareBufferReader(this, mSessionInfo.width, mSessionInfo.height, mSessionInfo.format
+		, 3
+		, AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER
+			//| AHARDWAREBUFFER_USAGE_CPU_WRITE_NEVER
+			| AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN
+			//| AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE
+		, HardwareBufferReader::PROC_IMAGE
+	);
+	mSessionInfo.input_window = mHardwareBufferReader->getANativeWindow();
+	mSessionInfo.input_window = mSessionInfo.input_window;
+}
+#endif
+	DLOGD( "# session window size: %04d x %04d format:%08x / bl data size:%04d x %04d format:%08x \r\n", 
+		mSessionInfo.width, mSessionInfo.height, mSessionInfo.format,
+		mSessionInfo.bl_width, mSessionInfo.bl_height, mSessionInfo.bl_format);
 
 	// maxvalue2pwm
 	for(int i=0;i<256;i++) {
@@ -256,14 +247,14 @@ FootballPPCpu::FootSessionCpu::FootSessionCpu(FootSession *session):
 			maxvalue2pwm[i] = 30;
 		}
 	}
-	fprintf(stderr, "maxvalue2pwm: \r\n");
+	DLOGD( "maxvalue2pwm: \r\n");
 	print_block_data(maxvalue2pwm, 16, 16);
 
 	// back_light_gamma
 	for(int i=0;i<256;i++) {
 		back_light_gamma[i] = (i*4095)/255;
 	}
-	fprintf(stderr, "back_light_gamma: \r\n");
+	DLOGD( "back_light_gamma: \r\n");
 	print_block_data(back_light_gamma, 16, 16);
 
 	// gamma_table
@@ -281,7 +272,7 @@ gamma_table=uint32(round(y));  % 0~255 -> 0~4095.ROM table
 		// double pow(double x,double y)
 		gamma_table[i] = (long)(pow(((double)i/255.0f), a_) * 4095.0f); 
 	}
-	fprintf(stderr, "gamma_table: \r\n");
+	DLOGD( "gamma_table: \r\n");
 	print_block_data(gamma_table, 16, 16);
 
 	// spread_tab
@@ -304,10 +295,10 @@ de_gamma_table=uint32(round(d.*(255*2^(Q_DEG-8))));   %%% 8bit 0~4095 -> 0~255
 	for(int i=0;i<4096;i++) {
 		de_gamma_table[i] = (pow(((double)i/4095.0f), 1.0f/a_) * 255.0f);
 	}
-	fprintf(stderr, "de_gamma_table\r\n"
+	DLOGD( "de_gamma_table\r\n"
 						"        : 0 ~ 255 \r\n");
 	print_block_data(de_gamma_table, 16, 16);
-	fprintf(stderr, 	"        : 3840 ~ 4095 \r\n");
+	DLOGD( 	"        : 3840 ~ 4095 \r\n");
 	print_block_data(de_gamma_table + 3840, 16, 16);
 
 /*
@@ -336,7 +327,7 @@ dim_tab = (dim_tab - 1)*0.3 +1;
 	for(int i=220;i<=255;i++, start += step) {
 		dim_tab[i] = start;
 	}
-	fprintf(stderr, "dim_tab:  \r\n");
+	DLOGD( "dim_tab:  \r\n");
 	print_block_data(dim_tab, 16, 16);
 }
 /*
@@ -357,14 +348,13 @@ alph_table(101:256)=0.3:0.002:0.61;
 }
 }
 FootballPPCpu::FootSessionCpu::~FootSessionCpu() {
-	if (mReader != nullptr) {
-		// if onImageAvailableCallback is ongoing , should wait it to finished !!!
-
-
-		// destroy reader
-		AImageReader_setImageListener(mReader, nullptr);
-		AImageReader_delete(mReader);
+{
+	if (mHardwareBufferReader != nullptr) {
+		delete mHardwareBufferReader;
+		mHardwareBufferReader = nullptr;
 	}
+}
+
 	delete mTestColorGenerator;
 
 	if (mLastIncommingData != nullptr) {
@@ -424,11 +414,11 @@ FootballPPCpu::FootSessionCpu::~FootSessionCpu() {
 	}
 
 	::football::MemTrace::print();
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 }
 
 bool FootballPPCpu::FootSessionCpu::isValid() {
-	return mFootSession.input_window != nullptr ? true : false;
+	return mSessionInfo.input_window != nullptr ? true : false;
 }
 
 
@@ -537,7 +527,7 @@ static void max__buffer(int *buf0, int *buf1, int width, int height, int *dstBuf
 
 }
 int FootballPPCpu::FootSessionCpu::led_spread() {
-	fprintf(stderr, "%s start. \r\n", __func__);
+	DLOGD( "%s start. \r\n", __func__);
 
 	const float LD_LED_SP_A1 = 0.0277f;
 	const float LD_LED_SP_B1 = 0.1110f;
@@ -560,7 +550,7 @@ int FootballPPCpu::FootSessionCpu::led_spread() {
 	int o_height = 0;
 	int o_width = 0;
 
-	fprintf(stderr, "led_blur_0 %4d x %4d \r\n", width, height);
+	DLOGD( "led_blur_0 %4d x %4d \r\n", width, height);
 	int *led_blur_0 = (int*)MALLOC_(width*height*sizeof(int) + 256);
 	assert(led_blur_0 != nullptr);
 	filter_temp(vt_bl, width, height, led_blur_0, A1, B1, C1);
@@ -581,7 +571,7 @@ int FootballPPCpu::FootSessionCpu::led_spread() {
 		}
 	}
 	
-	fprintf(stderr, "led_blur_2 %4d x %4d \r\n", width, height);
+	DLOGD( "led_blur_2 %4d x %4d \r\n", width, height);
 	int *led_blur_2 = (int*)MALLOC_(width*height*sizeof(int) + 256);
 	assert(led_blur_2 != nullptr);
 	filter_temp(blur_1_r_c, width, height, led_blur_2, A2, B2, C2);
@@ -602,7 +592,7 @@ int FootballPPCpu::FootSessionCpu::led_spread() {
 		}
 	}
 
-	fprintf(stderr, "led_blur_4 %4d x %4d \r\n", width, height);
+	DLOGD( "led_blur_4 %4d x %4d \r\n", width, height);
 	int *led_blur_4 = (int*)MALLOC_(width*height*sizeof(int) + 256);
 	assert(led_blur_4 != nullptr);
 	filter_temp(blur_3_r_c, width, height, led_blur_4, A2, B2, C2);
@@ -622,7 +612,7 @@ int FootballPPCpu::FootSessionCpu::led_spread() {
 		}
 	}
 
-	fprintf(stderr, "led_blur_6 %4d x %4d \r\n", width, height);
+	DLOGD( "led_blur_6 %4d x %4d \r\n", width, height);
 	int *led_blur_6 = (int*)MALLOC_(width*height*sizeof(int) + 256);
 	assert(led_blur_6 != nullptr);
 	filter_temp(blur_5_r_c, width, height, led_blur_6, A2, B2, C2);
@@ -642,7 +632,7 @@ int FootballPPCpu::FootSessionCpu::led_spread() {
 		}
 	}
 
-	fprintf(stderr, "led_blur_8 %4d x %4d \r\n", width, height);
+	DLOGD( "led_blur_8 %4d x %4d \r\n", width, height);
 	int *led_blur_8 = (int*)MALLOC_(width*height*sizeof(int) + 256);
 	assert(led_blur_8 != nullptr);
 	filter_temp(blur_7_r_c, width, height, led_blur_8, A2, B2, C2);
@@ -709,15 +699,15 @@ int FootballPPCpu::FootSessionCpu::led_spread() {
 	FREE_(blur_7_r_c);
 	FREE_(led_blur_8);
 
-	fprintf(stderr, "%s done! \r\n", __func__);
+	DLOGD( "%s done! \r\n", __func__);
 	return 0;
 }
-void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
-	LD_BLOCK_NUM_HOR = mFootSession.bl_width;
-	LD_BLOCK_NUM_VER = mFootSession.bl_height;
+void FootballPPCpu::FootSessionCpu::processImage1(AImageData *image_data) {
+	LD_BLOCK_NUM_HOR = mSessionInfo.bl_width;
+	LD_BLOCK_NUM_VER = mSessionInfo.bl_height;
 	
-	LD_PIC_DATA_HOR = mFootSession.width;
-	LD_PIC_DATA_VER = mFootSession.height;
+	LD_PIC_DATA_HOR = mSessionInfo.width;
+	LD_PIC_DATA_VER = mSessionInfo.height;
 	
 	LD_BLK_SIZE_HOR = ceil((double)LD_PIC_DATA_HOR / (double)LD_BLOCK_NUM_HOR);
 	LD_BLK_SIZE_VER = ceil((double)LD_PIC_DATA_VER / (double)LD_BLOCK_NUM_VER);
@@ -728,7 +718,7 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 	int deltaHor_l = floor(((double)aligned_width - (double)LD_PIC_DATA_HOR)/2.0f);
 	int deltaVer_u = floor(((double)aligned_height - (double)LD_PIC_DATA_VER)/2.0f);
 
-	fprintf(stderr, "bl size:%dx%d pic size:%dx%d blk size:%dx%d aligned:%dx%d delta:%d,%d \r\n", 
+	DLOGD( "bl size:%dx%d pic size:%dx%d blk size:%dx%d aligned:%dx%d delta:%d,%d \r\n", 
 		LD_BLOCK_NUM_HOR, LD_BLOCK_NUM_VER, LD_PIC_DATA_HOR, LD_PIC_DATA_VER,
 		LD_BLK_SIZE_HOR, LD_BLK_SIZE_VER, aligned_width, aligned_height, deltaHor_l, deltaVer_u);
 	//bl size:15x31 pic size:1080x1920 blk size:72x62 aligned:1080x1922 delta:0,1
@@ -799,10 +789,10 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 	block_width=LD_BLK_SIZE_HOR;
 	block_num_height=floor((double)aligned_height/(double)block_height);
 	block_num_width=floor((double)aligned_width/(double)block_width);
-	fprintf(stderr, "block size:%dx%d num:%dx%d \r\n", block_width, block_height, block_num_width, block_num_height);
+	DLOGD( "block size:%dx%d num:%dx%d \r\n", block_width, block_height, block_num_width, block_num_height);
 
 	int max_means_array_size = block_num_width*block_num_height*sizeof(int) + 256;
-	fprintf(stderr, "max_means_array_size:%d \r\n", max_means_array_size);
+	DLOGD( "max_means_array_size:%d \r\n", max_means_array_size);
 
 	if (max_value_array != nullptr) {
 		FREE_(max_value_array);
@@ -865,9 +855,9 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 			means[blk_line*block_num_width + blk_col] = mean_;
 		}
 	}
-	//fprintf(stderr, "max_value_array: \r\n");
+	//DLOGD( "max_value_array: \r\n");
 	//print_block_data(max_value_array, block_num_width, block_num_height);
-	//fprintf(stderr, "means: \r\n");
+	//DLOGD( "means: \r\n");
 	//print_block_data(means, block_num_width, block_num_height);
 
 	static const float LD_STASTIC_MAX_RATIO = 0.95f;
@@ -879,7 +869,7 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 		if (cur_ > 255) { cur_ = 255; } else if (cur_ < 0) { cur_ = 0; }
 		led_pwm_array[i] = maxvalue2pwm[cur_];
 	}
-	//fprintf(stderr, "led_pwm_array: \r\n");
+	//DLOGD( "led_pwm_array: \r\n");
 	//print_block_data(led_pwm_array, block_num_width, block_num_height);
 
 	static const float LD_SPACIAL_FILTER_A = 0.028f;
@@ -907,13 +897,13 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 	}
 }
 
-	//fprintf(stderr, "led_coeff_space: \r\n");
+	//DLOGD( "led_coeff_space: \r\n");
 	//print_block_data(led_coeff_space, block_num_width, block_num_height);
 
-	//fprintf(stderr, "led_coeff_gamma: \r\n");
+	//DLOGD( "led_coeff_gamma: \r\n");
 	//print_block_data(led_coeff_gamma, block_num_width, block_num_height);
 
-	//fprintf(stderr, "backlight_output: \r\n");
+	//DLOGD( "backlight_output: \r\n");
 	//print_block_data(backlight_output, block_num_width, block_num_height);
 
 	
@@ -969,7 +959,7 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 			vt_bl[r*block_num_width + c] = spread_tab[tmp];
 		}
 	}
-	//fprintf(stderr, "vt_bl: \r\n");
+	//DLOGD( "vt_bl: \r\n");
 	//print_block_data(vt_bl, block_num_width, block_num_height);
 
 /*
@@ -990,7 +980,7 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 	assert(led_blur != nullptr);
 	memset(led_blur, 0x7f, led_blur_SIZE);	// fill with 0xff result -1 value !
 
-	//fprintf(stderr, "led_blur (0,0) ~ (16, 16) \r\n");
+	//DLOGD( "led_blur (0,0) ~ (16, 16) \r\n");
 	//print_block_data(led_blur, LD_PIC_DATA_HOR, LD_PIC_DATA_VER, 0, 0, 16, 16);
 
 	////////////////////////////////////////////////////////////////////////////////////
@@ -1018,7 +1008,7 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 				max_lum = cur_blur_value > max_lum ? cur_blur_value : max_lum;
 			}
 		}
-		fprintf(stderr, "max_lum : %d \r\n", max_lum);
+		DLOGD( "max_lum : %d \r\n", max_lum);
 
 		for(int y=0;y<LD_PIC_DATA_VER;y++) {
 			for(int x=0;x<LD_PIC_DATA_HOR;x++) {
@@ -1096,7 +1086,7 @@ void FootballPPCpu::FootSessionCpu::processImage(AImageData *image_data) {
 				max_lum = cur_blur_value > max_lum ? cur_blur_value : max_lum;
 			}
 		}
-		fprintf(stderr, "bl_dim max_lum : %d \r\n", max_lum);
+		DLOGD( "bl_dim max_lum : %d \r\n", max_lum);
 
 		for(int y=0;y<LD_PIC_DATA_VER;y++) {
 			for(int x=0;x<LD_PIC_DATA_HOR;x++) {
@@ -1299,7 +1289,7 @@ void FootballPPCpu::FootSessionCpu::onImageProc1(AImageData *image_data) {
 	}
 	mLastIncommingData = new AImageData(image_data);
 
-	processImage(mLastIncommingData);
+	processImage1(mLastIncommingData);
 
 	//usleep(1*1000*1000);
 
@@ -1307,14 +1297,14 @@ void FootballPPCpu::FootSessionCpu::onImageProc1(AImageData *image_data) {
 
 #ifdef FILL_BL_DATA_FIRST
 	{
-		fprintf(stderr, ">>> backlight_data filling ...\r\n");
-		ANativeWindow * inputWindow = mFootSession.backlight_data;
+		DLOGD( ">>> backlight_data filling ...\r\n");
+		ANativeWindow * inputWindow = mSessionInfo.backlight_data;
 		fill_ANativeWindow_with_color(inputWindow, 0xffff0000);
 	}
 #endif
 	{
-		fprintf(stderr, ">>> final_image filling ...\r\n");
-		ANativeWindow * inputWindow = mFootSession.final_image;
+		DLOGD( ">>> final_image filling ...\r\n");
+		ANativeWindow * inputWindow = mSessionInfo.final_image;
 #if 0
 		uint32_t color_ = mTestColorGenerator->getColor();
 		fill_ANativeWindow_with_color(inputWindow, color_);
@@ -1327,18 +1317,27 @@ void FootballPPCpu::FootSessionCpu::onImageProc1(AImageData *image_data) {
 	}
 #ifndef FILL_BL_DATA_FIRST
 	{
-		fprintf(stderr, ">>> backlight_data filling ...\r\n");
-		ANativeWindow * inputWindow = mFootSession.backlight_data;
+		DLOGD( ">>> backlight_data filling ...\r\n");
+		ANativeWindow * inputWindow = mSessionInfo.backlight_data;
 		//fill_ANativeWindow_with_color(inputWindow, 0xffff0000);
 		fill_ANativeWindow_with_buff(inputWindow, (uint8_t *)backlight_output, block_num_width, block_num_height, block_num_width*4, 4);
 	}
 #endif
 
 }
+void FootballPPCpu::FootSessionCpu::processingImage(AImage *image_ ) {
+	AImageData *imageData = nullptr;
+	imageData = getAImageData_from_AImage(image_);
+	if (imageData != nullptr) {
+		onImageProc1(imageData);
+		delete imageData;
+	}
+}
 
+// impl public football::ImageReaderImageListenerWrapper
 void FootballPPCpu::FootSessionCpu::onImageAvailableCallback(AImageReader *reader) {
-	fprintf(stderr, "FootSessionCpu::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
-	if (reader != mReader) { fprintf(stderr, "*** impossible to reach here:%s,%d \r\n", __func__, __LINE__); return ;}
+	DLOGD( "FootSessionCpu::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
+	if (reader != mReader) { DLOGD( "*** impossible to reach here:%s,%d \r\n", __func__, __LINE__); return ;}
 
 	AImageData *imageData = nullptr;
 	AImage *image_ = nullptr;
@@ -1347,15 +1346,26 @@ void FootballPPCpu::FootSessionCpu::onImageAvailableCallback(AImageReader *reade
 		imageData = getAImageData_from_AImage(image_);
 		AImage_delete(image_);
 	}
-
 	if (imageData != nullptr) {
 		onImageProc1(imageData);
 		delete imageData;
 	}
 
 }
+// impl public HardwareBufferReader::CB
+int FootballPPCpu::FootSessionCpu::on_process_image(AImage *image_) {
+	processingImage(image_);
+	return 0;
+}
+
+// impl public ::football::FootballPP::FootballSession
 int FootballPPCpu::FootSessionCpu::setSessionParameter(SessionParameter *parameter) {
-	fprintf(stderr, "%s, have_algo = %d \r\n", __func__, parameter->have_algo);
+	if (parameter->trigger_request) {
+		parameter->trigger_request = 0;
+
+	}
+
+	DLOGD( "%s, have_algo = %d \r\n", __func__, parameter->have_algo);
 	mSessionParameter.have_algo = parameter->have_algo;
 	return 0;
 }
@@ -1364,7 +1374,7 @@ int FootballPPCpu::FootSessionCpu::getSessionParameter(SessionParameter *paramet
 	return 0;
 }
 void FootballPPCpu::FootSessionCpu::print() {
-	fprintf(stderr, "%s \r\n", __func__);
+	DLOGD( "%s \r\n", __func__);
 
 }
 
@@ -1373,103 +1383,27 @@ void FootballPPCpu::FootSessionCpu::print() {
 //
 FootballPPCpu::FootballPPCpu()
 	{
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 }
 
 FootballPPCpu::~FootballPPCpu() {
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	// should close all sessions
 }
 
-int FootballPPCpu::buildSession(FootSession *session, int *session_id) {
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+int FootballPPCpu::buildSession(int session_type, SessionInfo &session, int *session_id) {
+	DLOGD( "FootballPPCpu::%s,  session_type: %d \r\n", __func__, session_type);
 
-	FootSessionCpu * sessionCpu = new FootSessionCpu(session);
-	if (!sessionCpu->isValid()) {
-		delete sessionCpu;
-		fprintf(stderr, "%s,%d not valid\r\n", __func__, __LINE__);
+	FootSessionCpu * session_ = new FootSessionCpu(session);
+	if (!session_->isValid()) {
+		delete session_;
+		DLOGD( "%s,%d not valid\r\n", __func__, __LINE__);
 		return -1;
 	}
-	sessionCpu->mId = ++s_SessionId_generator;
-	mSessionIds.push_back(sessionCpu->mId);
-	mSessions.insert(std::pair<int, FootSessionCpu*>(sessionCpu->mId, sessionCpu)); // *** Note: if the key is exist , insert will failed !!!
-	*session_id = sessionCpu->mId;
-	fprintf(stderr, "%s id: %d \r\n", __func__, sessionCpu->mId);
+	session_->mId = addSession(session_);
+	*session_id = session_->mId;
+	DLOGD( "%s id: %d \r\n", __func__, session_->mId);
 	return 0;
-}
-int FootballPPCpu::closeSession(int session_id) {
-	// should wait this session's processing is finished !
-	int found;
-	fprintf(stderr, "closeSession id:%d \r\n", session_id);
-
-	{
-		found = 0;
-		std::map<int, FootSessionCpu*>::iterator iter2;
-		/*
-		for (iter2 = mSessions.begin(); iter2 != mSessions.end(); iter2++) {
-			//cout << iter2->first << ": " << iter2->second << endl;
-			if (iter2->first == session_id) {
-				FootSessionCpu* session_cpu = (FootSessionCpu*)iter2->second;
-			}
-		}
-		*/
-		iter2 = mSessions.find(session_id);
-		if (iter2 != mSessions.end()) {
-			found = 1;
-			fprintf(stderr, "mSessions %d found \r\n", session_id);
-			FootSessionCpu* session_cpu = (FootSessionCpu*)iter2->second;
-			mSessions.erase(session_id);
-			delete session_cpu;
-		}
-		
-	}
-
-	{
-		found = 0;
-		std::vector<int>::iterator iter1 = std::find(mSessionIds.begin(),mSessionIds.end(), session_id);
-		if(iter1 != mSessionIds.end()) {
-			mSessionIds.erase(iter1);
-			found = 1;
-			fprintf(stderr, "mSessionIds %d found \r\n", session_id);
-		}
-	}
-
-
-
-	return 0;
-}
-int FootballPPCpu::setSessionParameter(int session_id, SessionParameter *parameter) {
-	std::map<int, FootSessionCpu*>::iterator iter2;
-	iter2 = mSessions.find(session_id);
-	if (iter2 != mSessions.end()) {
-		FootSessionCpu* session_cpu = (FootSessionCpu*)iter2->second;
-		session_cpu->setSessionParameter(parameter);
-	}
-	return -1;
-}
-int FootballPPCpu::getSessionParameter(int session_id, SessionParameter *parameter) {
-	std::map<int, FootSessionCpu*>::iterator iter2;
-	iter2 = mSessions.find(session_id);
-	if (iter2 != mSessions.end()) {
-		FootSessionCpu* session_cpu = (FootSessionCpu*)iter2->second;
-		session_cpu->getSessionParameter(parameter);
-	}
-	return -1;
-}
-
-std::vector<int> FootballPPCpu::getSessionIds() {
-	return mSessionIds;
-}
-int FootballPPCpu::getSession(int session_id, FootSession *session) {
-	return 0;
-}
-void FootballPPCpu::print(int session_id) {
-	std::map<int, FootSessionCpu*>::iterator iter2;
-	iter2 = mSessions.find(session_id);
-	if (iter2 != mSessions.end()) {
-		FootSessionCpu* session_cpu = (FootSessionCpu*)iter2->second;
-		session_cpu->print();
-	}
 }
 
 

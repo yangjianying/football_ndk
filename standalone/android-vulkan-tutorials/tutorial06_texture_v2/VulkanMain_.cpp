@@ -17,6 +17,8 @@
 #include <cassert>
 #include <vector>
 
+#include "FootballConfig.h"
+
 #include "vulkan_wrapper.h"
 
 #include "StbImageUtils.h"
@@ -26,8 +28,11 @@
 
 #include "AAssetManagerImpl_.h"
 
+#undef __CLASS__
+#define __CLASS__ "VulkanMain_"
+
 // Android log function wrappers
-static const char* kTAG = "native_app-vk";
+static const char* kTAG = "VulkanMain_";
 #include "android_logcat_.h"
 
 // Vulkan call wrapper
@@ -59,7 +64,7 @@ struct VulkanDeviceInfo {
   VkSurfaceKHR surface_;
   VkQueue queue_;
 };
-VulkanDeviceInfo device;
+static VulkanDeviceInfo device;
 
 struct VulkanSwapchainInfo {
   VkSwapchainKHR swapchain_;
@@ -73,7 +78,7 @@ struct VulkanSwapchainInfo {
   VkImage* displayImages_;
   VkImageView* displayViews_;
 };
-VulkanSwapchainInfo swapchain;
+static VulkanSwapchainInfo swapchain;
 
 typedef struct texture_object {
   VkSampler sampler;
@@ -89,12 +94,12 @@ static const VkFormat kTexFmt = VK_FORMAT_R8G8B8A8_UNORM;
 const char* texFiles[TUTORIAL_TEXTURE_COUNT] = {
     "sample_tex.png",
 };
-struct texture_object textures[TUTORIAL_TEXTURE_COUNT];
+static struct texture_object textures[TUTORIAL_TEXTURE_COUNT];
 
 struct VulkanBufferInfo {
   VkBuffer vertexBuf_;
 };
-VulkanBufferInfo buffers;
+static VulkanBufferInfo buffers;
 
 struct VulkanGfxPipelineInfo {
   VkDescriptorSetLayout dscLayout_;
@@ -104,7 +109,7 @@ struct VulkanGfxPipelineInfo {
   VkPipelineCache cache_;
   VkPipeline pipeline_;
 };
-VulkanGfxPipelineInfo gfxPipeline;
+static VulkanGfxPipelineInfo gfxPipeline;
 
 struct VulkanRenderInfo {
   VkRenderPass renderPass_;
@@ -114,32 +119,35 @@ struct VulkanRenderInfo {
   VkSemaphore semaphore_;
   VkFence fence_;
 };
-VulkanRenderInfo render;
+
+static VulkanRenderInfo render;
 
 // Android Native App pointer...
-android_app_* androidAppCtx = nullptr;
-void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
+static android_app_* androidAppCtx = nullptr;
+
+static void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
                     VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
                     VkPipelineStageFlags srcStages,
                     VkPipelineStageFlags destStages);
 
 // Create vulkan device
+static
 void CreateVulkanDevice(ANativeWindow* platformWindow,
                         VkApplicationInfo* appInfo) {
 {
 	uint32_t numInstanceLayers = 0;
 	std::vector<VkLayerProperties> instanceLayerProperties;
 	vkEnumerateInstanceLayerProperties(&numInstanceLayers, nullptr);
-	fprintf(stderr, "numInstanceLayers:%d \r\n", numInstanceLayers);
+	DLOGD( "numInstanceLayers:%d \r\n", numInstanceLayers);
 	if (numInstanceLayers != 0) {
 		instanceLayerProperties.resize(numInstanceLayers);
 		vkEnumerateInstanceLayerProperties(&numInstanceLayers, instanceLayerProperties.data());
 
 		for(int i=0;i<numInstanceLayers;i++) {
 			VkLayerProperties pro_ = instanceLayerProperties[i];
-			fprintf(stderr, "  %s, specVersion:%d implementationVersion:%d \r\n",
+			DLOGD( "  %s, specVersion:%d implementationVersion:%d \r\n",
 				pro_.layerName, pro_.specVersion, pro_.implementationVersion);
-			fprintf(stderr, "	 %s", pro_.description);
+			DLOGD( "	 %s", pro_.description);
 		}
 	}
 }
@@ -147,13 +155,13 @@ void CreateVulkanDevice(ANativeWindow* platformWindow,
 	uint32_t numInstanceExtensions = 0;
 	std::vector<VkExtensionProperties> instanceExtensionProperties;
 	vkEnumerateInstanceExtensionProperties(nullptr, &numInstanceExtensions, nullptr);
-	fprintf(stderr, "numInstanceExtensions:%d \r\n", numInstanceExtensions);
+	DLOGD( "numInstanceExtensions:%d \r\n", numInstanceExtensions);
 	if (numInstanceExtensions > 0) {
 		instanceExtensionProperties.resize(numInstanceExtensions);
 		vkEnumerateInstanceExtensionProperties(nullptr, &numInstanceExtensions, instanceExtensionProperties.data());
 		for(int i=0;i<numInstanceExtensions;i++) {
 			VkExtensionProperties ext_ = instanceExtensionProperties[i];
-			fprintf(stderr, "  %s, specVersion:%d \r\n",
+			DLOGD( "  %s, specVersion:%d \r\n",
 				ext_.extensionName, ext_.specVersion);
 		}
 
@@ -210,7 +218,7 @@ VK_KHR_external_fence_capabilities, specVersion:1
   // for this sample, we use the very first GPU device found on the system
   uint32_t gpuCount = 0;
   CALL_VK(vkEnumeratePhysicalDevices(device.instance_, &gpuCount, nullptr));
-  fprintf(stderr, "%s, gpuCount = %d \r\n", __func__, gpuCount);
+  DLOGD( "%s, gpuCount = %d \r\n", __func__, gpuCount);
 
   VkPhysicalDevice tmpGpus[gpuCount];
   CALL_VK(vkEnumeratePhysicalDevices(device.instance_, &gpuCount, tmpGpus));
@@ -220,15 +228,15 @@ VK_KHR_external_fence_capabilities, specVersion:1
 	  uint32_t numDeviceLayers = 0;
 	  std::vector<VkLayerProperties> deviceLayerProperties;
 	vkEnumerateDeviceLayerProperties(device.gpuDevice_, &numDeviceLayers, nullptr);
-	fprintf(stderr, "numDeviceLayers:%d \r\n", numDeviceLayers);
+	DLOGD( "numDeviceLayers:%d \r\n", numDeviceLayers);
 	if (numDeviceLayers > 0) {
 		deviceLayerProperties.resize(numDeviceLayers);
 		vkEnumerateDeviceLayerProperties(device.gpuDevice_, &numDeviceLayers, deviceLayerProperties.data());
 		for(int i=0;i<numDeviceLayers;i++) {
 			VkLayerProperties pro_ = deviceLayerProperties[i];
-			fprintf(stderr, "  %s, specVersion:%d implementationVersion:%d \r\n",
+			DLOGD( "  %s, specVersion:%d implementationVersion:%d \r\n",
 				pro_.layerName, pro_.specVersion, pro_.implementationVersion);
-			fprintf(stderr, "    %s", pro_.description);
+			DLOGD( "    %s", pro_.description);
 		}
 	}
 }
@@ -236,13 +244,13 @@ VK_KHR_external_fence_capabilities, specVersion:1
   uint32_t numDeviceExtensions = 0;
   std::vector<VkExtensionProperties> deviceExtensionProperties;
   vkEnumerateDeviceExtensionProperties(device.gpuDevice_, nullptr, &numDeviceExtensions, nullptr);
-  fprintf(stderr, "numDeviceExtensions:%d \r\n", numDeviceExtensions);
+  DLOGD( "numDeviceExtensions:%d \r\n", numDeviceExtensions);
   if (numDeviceExtensions > 0) {
 	  deviceExtensionProperties.resize(numDeviceExtensions);
 	  vkEnumerateDeviceExtensionProperties(device.gpuDevice_, nullptr, &numDeviceExtensions, deviceExtensionProperties.data());
 	  for(int i=0;i<numDeviceExtensions;i++) {
 		  VkExtensionProperties ext_ = deviceExtensionProperties[i];
-		  fprintf(stderr, "  %s, specVersion:%d \r\n",
+		  DLOGD( "  %s, specVersion:%d \r\n",
 			  ext_.extensionName, ext_.specVersion);
 	  }
 
@@ -306,37 +314,37 @@ VK_KHR_external_fence_fd, specVersion:1
   device_extensions.push_back("VK_KHR_external_memory");
   device_extensions.push_back("VK_KHR_external_memory_fd");
   device_extensions.push_back("VK_KHR_multiview");
-  device_extensions.push_back("VK_ANDROID_external_memory_android_hardware_buffer");  // when import hardwarebuffer, must enable this device extension
+  device_extensions.push_back("VK_ANDROID_external_memory_android_hardware_buffer"); // when import hardwarebuffer, must enable this device extension
   device_extensions.push_back("VK_KHR_swapchain");
   device_extensions.push_back("VK_KHR_external_fence_fd");
 {
 	VkPhysicalDeviceProperties physicalDeviceProperties;
 	vkGetPhysicalDeviceProperties(device.gpuDevice_, &physicalDeviceProperties);
-	fprintf(stderr, "physicalDeviceProperties: \r\n");
-	fprintf(stderr, "    apiVersion: 0x%08x \r\n", physicalDeviceProperties.apiVersion);
-	fprintf(stderr, "    driverVersion: 0x%08x \r\n", physicalDeviceProperties.driverVersion);
-	fprintf(stderr, "    vendorID: %d \r\n", physicalDeviceProperties.vendorID);
-	fprintf(stderr, "    deviceID: %d \r\n", physicalDeviceProperties.deviceID);
-	fprintf(stderr, "    deviceType: %d \r\n", physicalDeviceProperties.deviceType); 
-																					// VkPhysicalDeviceType
-																					// VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
-	fprintf(stderr, "    deviceName: %s \r\n", physicalDeviceProperties.deviceName);
-	fprintf(stderr, "    limits: \r\n");
-	fprintf(stderr, "    limits.maxImageDimension1D: %d \r\n", physicalDeviceProperties.limits.maxImageDimension1D);
-	fprintf(stderr, "    limits.maxImageDimension2D: %d \r\n", physicalDeviceProperties.limits.maxImageDimension2D);
-	fprintf(stderr, "    limits.maxImageDimension3D: %d \r\n", physicalDeviceProperties.limits.maxImageDimension3D);
-	fprintf(stderr, "    limits.maxBoundDescriptorSets: %d \r\n", physicalDeviceProperties.limits.maxBoundDescriptorSets);
-	fprintf(stderr, "    limits.maxVertexInputAttributes: %d \r\n", physicalDeviceProperties.limits.maxVertexInputAttributes);
-	fprintf(stderr, "    limits.maxVertexInputBindings: %d \r\n", physicalDeviceProperties.limits.maxVertexInputBindings);
-	fprintf(stderr, "    limits.maxViewports: %d \r\n", physicalDeviceProperties.limits.maxViewports);
-	fprintf(stderr, "    sparseProperties: \r\n");
-	fprintf(stderr, "    sparseProperties.residencyStandard2DBlockShape: %d \r\n", 
+	DLOGD( "physicalDeviceProperties: \r\n");
+	DLOGD( "    apiVersion: 0x%08x \r\n", physicalDeviceProperties.apiVersion);
+	DLOGD( "    driverVersion: 0x%08x \r\n", physicalDeviceProperties.driverVersion);
+	DLOGD( "    vendorID: %d \r\n", physicalDeviceProperties.vendorID);
+	DLOGD( "    deviceID: %d \r\n", physicalDeviceProperties.deviceID);
+	DLOGD( "    deviceType: %d \r\n", physicalDeviceProperties.deviceType); 
+																	// VkPhysicalDeviceType
+																	// VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+	DLOGD( "    deviceName: %s \r\n", physicalDeviceProperties.deviceName);
+	DLOGD( "    limits: \r\n");
+	DLOGD( "    limits.maxImageDimension1D: %d \r\n", physicalDeviceProperties.limits.maxImageDimension1D);
+	DLOGD( "    limits.maxImageDimension2D: %d \r\n", physicalDeviceProperties.limits.maxImageDimension2D);
+	DLOGD( "    limits.maxImageDimension3D: %d \r\n", physicalDeviceProperties.limits.maxImageDimension3D);
+	DLOGD( "    limits.maxBoundDescriptorSets: %d \r\n", physicalDeviceProperties.limits.maxBoundDescriptorSets);
+	DLOGD( "    limits.maxVertexInputAttributes: %d \r\n", physicalDeviceProperties.limits.maxVertexInputAttributes);
+	DLOGD( "    limits.maxVertexInputBindings: %d \r\n", physicalDeviceProperties.limits.maxVertexInputBindings);
+	DLOGD( "    limits.maxViewports: %d \r\n", physicalDeviceProperties.limits.maxViewports);
+	DLOGD( "    sparseProperties: \r\n");
+	DLOGD( "    sparseProperties.residencyStandard2DBlockShape: %d \r\n", 
 					physicalDeviceProperties.sparseProperties.residencyStandard2DBlockShape);
-	fprintf(stderr, "    sparseProperties.residencyStandard2DMultisampleBlockShape: %d \r\n", 
+	DLOGD( "    sparseProperties.residencyStandard2DMultisampleBlockShape: %d \r\n", 
 					physicalDeviceProperties.sparseProperties.residencyStandard2DMultisampleBlockShape);
-	fprintf(stderr, "    sparseProperties.residencyStandard3DBlockShape: %d \r\n", 
+	DLOGD( "    sparseProperties.residencyStandard3DBlockShape: %d \r\n", 
 					physicalDeviceProperties.sparseProperties.residencyStandard3DBlockShape);
-	fprintf(stderr, "    sparseProperties.residencyAlignedMipSize: %d \r\n", 
+	DLOGD( "    sparseProperties.residencyAlignedMipSize: %d \r\n", 
 					physicalDeviceProperties.sparseProperties.residencyAlignedMipSize);
 
 	VkPhysicalDeviceFeatures physicalDeviceFeatures;
@@ -359,9 +367,9 @@ VK_KHR_external_fence_fd, specVersion:1
 
 // print all queue family's queueFlags
 {
-	fprintf(stderr, "physical device queueFamilyCount:%d \r\n", queueFamilyCount);
+	DLOGD( "physical device queueFamilyCount:%d \r\n", queueFamilyCount);
 	 for (int i = 0; i < queueFamilyCount; i++) {
-	   fprintf(stderr, "  index:%d queueFlags:0x%08x queueCount:%d timestampValidBits:%d \r\n",
+	   DLOGD( "  index:%d queueFlags:0x%08x queueCount:%d timestampValidBits:%d \r\n",
 		   i, queueFamilyProperties[i].queueFlags, queueFamilyProperties[i].queueCount,
 		   queueFamilyProperties[i].timestampValidBits);
 	 }
@@ -425,12 +433,14 @@ VK_QUEUE_PROTECTED_BIT = 0x00000010,		// *
                          &device.device_));
   vkGetDeviceQueue(device.device_, 0, 0, &device.queue_);
 }
+static
 void DeleteVulkanDevice() {
 	vkDestroyDevice(device.device_, nullptr);
 	vkDestroySurfaceKHR(device.instance_, device.surface_, nullptr);
 	vkDestroyInstance(device.instance_, nullptr);
 
 }
+static
 void CreateSwapChain(void) {
   LOGI("->createSwapChain");
   memset(&swapchain, 0, sizeof(swapchain));
@@ -494,6 +504,7 @@ void CreateSwapChain(void) {
   delete[] formats;
   LOGI("<-createSwapChain");
 }
+static
 void CreateFrameBuffers(VkRenderPass& renderPass,
                         VkImageView depthView = VK_NULL_HANDLE) {
   // query display attachment to swapchain
@@ -557,7 +568,7 @@ void CreateFrameBuffers(VkRenderPass& renderPass,
                                 &swapchain.framebuffers_[i]));
   }
 }
-
+static
 void DeleteSwapChain(void) {
   for (int i = 0; i < swapchain.swapchainLength_; i++) {
     vkDestroyFramebuffer(device.device_, swapchain.framebuffers_[i], nullptr);
@@ -575,6 +586,7 @@ void DeleteSwapChain(void) {
 // A help function to map required memory property into a VK memory type
 // memory type is an index into the array of 32 entries; or the bit index
 // for the memory type ( each BIT of an 32 bit integer is a type ).
+static
 VkResult AllocateMemoryTypeFromProperties(uint32_t typeBits,
                                           VkFlags requirements_mask,
                                           uint32_t* typeIndex) {
@@ -593,7 +605,7 @@ VkResult AllocateMemoryTypeFromProperties(uint32_t typeBits,
   // No memory types matched, return failure
   return VK_ERROR_MEMORY_MAP_FAILED;
 }
-
+static
 VkResult LoadTextureFromFile(const char* filePath,
                              struct texture_object* tex_obj,
                              VkImageUsageFlags usage, VkFlags required_props) {
@@ -614,7 +626,7 @@ VkResult LoadTextureFromFile(const char* filePath,
     // linear format supporting the required texture
     needBlit = false;
   }
-  fprintf(stderr, "%s, needBlit:%d \r\n", __func__, needBlit);
+  DLOGD( "%s, needBlit:%d \r\n", __func__, needBlit);
 
   // Read the file:
   AAsset* file = AAssetManager_open(androidAppCtx->activity->assetManager,
@@ -829,7 +841,7 @@ VkResult LoadTextureFromFile(const char* filePath,
   }
   return VK_SUCCESS;
 }
-
+static
 void CreateTexture(void) {
   for (uint32_t i = 0; i < TUTORIAL_TEXTURE_COUNT; i++) {
     LoadTextureFromFile(texFiles[i], &textures[i], VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -874,6 +886,7 @@ void CreateTexture(void) {
                             &textures[i].sampler));
   }
 }
+static
 void DeleteTexture() {
 	for (uint32_t i = 0; i < TUTORIAL_TEXTURE_COUNT; i++) {
 		vkDestroyImage(device.device_, textures[i].image, nullptr);
@@ -889,13 +902,15 @@ struct ImportTexture {
 	VkImageView imageView_ = VK_NULL_HANDLE;
 	VkSampler sampler_ = VK_NULL_HANDLE;
 };
-ImportTexture importTexture;
+static ImportTexture importTexture;
 
 int importAHardwareBufferAsTexture(AHardwareBuffer *hardwareBuffer) {
-	fprintf(stderr, "%s ... \r\n", __func__);
+	DLOGD( "%s ... \r\n", __func__);
 
 	AHardwareBuffer_Desc hardwareBufferDesc;
 	AHardwareBuffer_describe(hardwareBuffer, &hardwareBufferDesc);
+
+	DLOGD( "  hardwareBufferDesc, size:%4d x %4d \r\n", hardwareBufferDesc.width, hardwareBufferDesc.height);
 
 	if (importTexture.image_ != VK_NULL_HANDLE) { // release old
 		vkDestroyImage(device.device_,importTexture.image_, nullptr);
@@ -906,131 +921,171 @@ int importAHardwareBufferAsTexture(AHardwareBuffer *hardwareBuffer) {
 		importTexture.imageMem_ = VK_NULL_HANDLE;
 	}
 
-	{
-	#if 0
-		VkAndroidHardwareBufferUsageANDROID usageAndroid = {
-			.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_USAGE_ANDROID,
-			.pNext = nullptr,
-			};
-		VkImageFormatProperties2 properties2 = {
-			.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
-			.pNext = &usageAndroid,
-			};
+	bool needBlit = false; // must not set true, if import HadrdwareBuffer into vulkan !!! 
+				// as the image usage bit should not be VK_IMAGE_USAGE_TRANSFER_SRC_BIT except VK_IMAGE_USAGE_SAMPLED_BIT
 
-		VkPhysicalDeviceImageFormatInfo2 info2 = {
-			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
-			.pNext = nullptr,
-			};
-		vkGetPhysicalDeviceImageFormatProperties2(device.gpuDevice_, &info2, &properties2);
-	#endif
+//{
+#if 0
+	VkAndroidHardwareBufferUsageANDROID usageAndroid = {
+		.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_USAGE_ANDROID,
+		.pNext = nullptr,
+		};
+	VkImageFormatProperties2 properties2 = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2,
+		.pNext = &usageAndroid,
+		};
 
-		//
-		VkAndroidHardwareBufferFormatPropertiesANDROID bufferFormatProperties = {
-			.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID,
-			.pNext = nullptr,
-			//.format,
-			//.externalFormat,
-			//.formatFeatures,
-			//.samplerYcbcrConversionComponents,
-			//.suggestedYcbcrModel,
-			//.suggestedYcbcrRange,
-			//.suggestedXChromaOffset,
-			//.suggestedYChromaOffset,
-			};
-		
-		VkAndroidHardwareBufferPropertiesANDROID bufferProperities = {
-			.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
-			.pNext = &bufferFormatProperties,
-			//.allocationSize = 0,
-			//.memoryTypeBits = 0,
-			};
-		VkResult ret = vkGetAndroidHardwareBufferPropertiesANDROID(device.device_, 
-			hardwareBuffer, &bufferProperities);
+	VkPhysicalDeviceImageFormatInfo2 info2 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2,
+		.pNext = nullptr,
+		};
+	vkGetPhysicalDeviceImageFormatProperties2(device.gpuDevice_, &info2, &properties2);
+#endif
 
-		// create image
-		VkExternalFormatANDROID  externalFormatAndroid = {
-			.sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
-			.pNext = nullptr,
-			.externalFormat = bufferFormatProperties.externalFormat,
-			};
+	//
+	VkAndroidHardwareBufferFormatPropertiesANDROID bufferFormatProperties = {
+		.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_FORMAT_PROPERTIES_ANDROID,
+		.pNext = nullptr,
+		//.format,
+		//.externalFormat,
+		//.formatFeatures,
+		//.samplerYcbcrConversionComponents,
+		//.suggestedYcbcrModel,
+		//.suggestedYcbcrRange,
+		//.suggestedXChromaOffset,
+		//.suggestedYChromaOffset,
+		};
+	
+	VkAndroidHardwareBufferPropertiesANDROID bufferProperities = {
+		.sType = VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
+		.pNext = &bufferFormatProperties,
+		.allocationSize = 0,
+		.memoryTypeBits = 0,
+		};
+	VkResult ret = vkGetAndroidHardwareBufferPropertiesANDROID(device.device_, 
+		hardwareBuffer, &bufferProperities);
 
-		bool needBlit = false; // whatever
-		VkImageCreateInfo imageCreateInfo = {
-		      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-		      .pNext = &externalFormatAndroid,
-			  .flags = 0,
-		      .imageType = VK_IMAGE_TYPE_2D,
-		      .format = kTexFmt,
-		      .extent = {static_cast<uint32_t>(hardwareBufferDesc.width),
-		                 static_cast<uint32_t>(hardwareBufferDesc.height), 1},
-		      .mipLevels = 1,
-		      .arrayLayers = 1,
-		      .samples = VK_SAMPLE_COUNT_1_BIT,
-		      .tiling = VK_IMAGE_TILING_LINEAR,
-		      .usage = (needBlit ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-		                         : VK_IMAGE_USAGE_SAMPLED_BIT),
-		      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-		      .queueFamilyIndexCount = 1,
-		      .pQueueFamilyIndices = &device.queueFamilyIndex_,
-		      .initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
-		  };
-		imageCreateInfo.format = VK_FORMAT_UNDEFINED;
-		//imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-		imageCreateInfo.flags &= ~VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;  // must not include
+	DLOGD( "  bufferFormatProperties.format:0x%" PRIx32 " / %" PRId32 "\r\n", 
+		bufferFormatProperties.format, bufferFormatProperties.format);
+		//0x25/37 VK_FORMAT_R8G8B8A8_UNORM
+	DLOGD( "  bufferFormatProperties.externalFormat:0x%" PRIx64 " / %" PRId64 "\r\n", 
+		bufferFormatProperties.externalFormat, bufferFormatProperties.externalFormat);
 
-		CALL_VK(vkCreateImage(device.device_, &imageCreateInfo, nullptr,
-							  &importTexture.image_));
+	// create image
+	VkExternalMemoryImageCreateInfo externalMemoryImageCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
+		.pNext = nullptr,
+		.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID,
+		};
+	VkExternalFormatANDROID  externalFormatAndroid = {
+		.sType = VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_ANDROID,
+		.pNext = &externalMemoryImageCreateInfo,
+		.externalFormat = bufferFormatProperties.externalFormat,
+		};
 
-		VkMemoryRequirements mem_reqs;
-		vkGetImageMemoryRequirements(device.device_, importTexture.image_, &mem_reqs);
-		
+	VkImageCreateInfo imageCreateInfo = {
+	      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+	      .pNext = &externalFormatAndroid,
+		  .flags = 0,
+	      .imageType = VK_IMAGE_TYPE_2D,
+	      .format = kTexFmt,
+	      .extent = {static_cast<uint32_t>(hardwareBufferDesc.width),
+	                 static_cast<uint32_t>(hardwareBufferDesc.height), 1},
+	      .mipLevels = 1,
+	      .arrayLayers = 1,
+	      .samples = VK_SAMPLE_COUNT_1_BIT,
+	      .tiling = VK_IMAGE_TILING_LINEAR,
+	      .usage = (needBlit ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+	                         : VK_IMAGE_USAGE_SAMPLED_BIT),
+	      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+	      .queueFamilyIndexCount = 1,
+	      .pQueueFamilyIndices = &device.queueFamilyIndex_,
+	      .initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
+	  };
 
+/*
 
-		// create memory
-		VkImportAndroidHardwareBufferInfoANDROID  importHardwareBufferAndroid = {
-			.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
-			.pNext = nullptr,
-			.buffer = hardwareBuffer,
-			};
-		VkMemoryAllocateInfo allocateInfo = {
-			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-			.pNext = &importHardwareBufferAndroid,
-			.allocationSize = 0,
-			.memoryTypeIndex = 0,
-			};
+If the pNext chain includes a VkExternalFormatANDROID structure, 
+and its externalFormat member is non-zero the format must be VK_FORMAT_UNDEFINED.
+
+If the pNext chain does not include a VkExternalFormatANDROID structure, 
+or does and its externalFormat member is 0, the format must not be VK_FORMAT_UNDEFINED.
+
+If the pNext chain includes a VkExternalMemoryImageCreateInfo structure 
+whose handleTypes member includes VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID, 
+imageType must be VK_IMAGE_TYPE_2D.
+
+If the pNext chain includes a VkExternalMemoryImageCreateInfo structure 
+whose handleTypes member includes VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID, 
+mipLevels must either be 1 or equal to the number of levels in the complete mipmap chain based on extent.width, extent.height, and extent.depth.
+
+If the pNext chain includes a VkExternalFormatANDROID structure 
+whose externalFormat member is not 0, flags must not include VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT.
+
+If the pNext chain includes a VkExternalFormatANDROID structure 
+whose externalFormat member is not 0, usage must not include any usages except VK_IMAGE_USAGE_SAMPLED_BIT.
+
+If the pNext chain includes a VkExternalFormatANDROID structure 
+whose externalFormat member is not 0, tiling must be VK_IMAGE_TILING_OPTIMAL.
+
+*/
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.format = VK_FORMAT_UNDEFINED;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageCreateInfo.flags &= ~VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;  // must not include
+
+	CALL_VK(vkCreateImage(device.device_, &imageCreateInfo, nullptr,
+						  &importTexture.image_));
+
+	VkMemoryRequirements mem_reqs;
+	vkGetImageMemoryRequirements(device.device_, importTexture.image_, &mem_reqs);
+	
+	// create memory
+	VkImportAndroidHardwareBufferInfoANDROID  importHardwareBufferAndroid = {
+		.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
+		.pNext = nullptr,
+		.buffer = hardwareBuffer,
+		};
+	VkMemoryAllocateInfo allocateInfo = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.pNext = &importHardwareBufferAndroid,
+		.allocationSize = 0,
+		.memoryTypeIndex = 0,
+		};
 
 #if 0  // when import hardwarebuffer, must not set the .allocationSize, .memoryTypeIndex
-	#if 1
-		allocateInfo.allocationSize = mem_reqs.size;
-		fprintf(stderr, "%s, mem_reqs.memoryTypeBits:0x%08x \r\n", __func__, mem_reqs.memoryTypeBits);
-		VK_CHECK(AllocateMemoryTypeFromProperties(mem_reqs.memoryTypeBits,
-												  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-												  &allocateInfo.memoryTypeIndex));
-	#else
-		allocateInfo.allocationSize = bufferProperities.allocationSize;
-		fprintf(stderr, "%s, bufferProperities.memoryTypeBits:0x%08x \r\n", __func__, bufferProperities.memoryTypeBits);
-		VK_CHECK(AllocateMemoryTypeFromProperties(bufferProperities.memoryTypeBits,
-												  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-												  &allocateInfo.memoryTypeIndex));
-	#endif
+#if 0
+	allocateInfo.allocationSize = mem_reqs.size;
+	DLOGD( "%s, mem_reqs.memoryTypeBits:0x%08x \r\n", __func__, mem_reqs.memoryTypeBits);
+	VK_CHECK(AllocateMemoryTypeFromProperties(mem_reqs.memoryTypeBits,
+											  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+											  &allocateInfo.memoryTypeIndex));
+#else
+	allocateInfo.allocationSize = bufferProperities.allocationSize;
+	DLOGD( "%s, bufferProperities.memoryTypeBits:0x%08x \r\n", __func__, bufferProperities.memoryTypeBits);
+	VK_CHECK(AllocateMemoryTypeFromProperties(bufferProperities.memoryTypeBits,
+											  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+											  &allocateInfo.memoryTypeIndex));
 #endif
-		CALL_VK(vkAllocateMemory(device.device_, &allocateInfo, nullptr, &importTexture.imageMem_));
+#endif
+	CALL_VK(vkAllocateMemory(device.device_, &allocateInfo, nullptr, &importTexture.imageMem_));
 
-		CALL_VK(vkBindImageMemory(device.device_, importTexture.image_, importTexture.imageMem_, 0));
-
-	}
-
+	CALL_VK(vkBindImageMemory(device.device_, importTexture.image_, importTexture.imageMem_, 0));
+//}
 
 #if 0
+	if (needBlit)
 	{
+		DLOGD( "%s,%d begin blit ... \r\n", __func__, __LINE__);
+
 		VkCommandPoolCreateInfo cmdPoolCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 			.pNext = nullptr,
 			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 			.queueFamilyIndex = device.queueFamilyIndex_,
 		};
-		
+
 		VkCommandPool cmdPool;
 		CALL_VK(vkCreateCommandPool(device.device_, &cmdPoolCreateInfo, nullptr,
 									&cmdPool));
@@ -1054,11 +1109,14 @@ int importAHardwareBufferAsTexture(AHardwareBuffer *hardwareBuffer) {
 
 
 		setImageLayout(gfxCmd, importTexture.image_, 
-			VK_IMAGE_LAYOUT_PREINITIALIZED,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-	        VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+			VK_IMAGE_LAYOUT_PREINITIALIZED,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	        VK_PIPELINE_STAGE_HOST_BIT, 
+	        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
 
 		CALL_VK(vkEndCommandBuffer(gfxCmd));
+		
 		VkFenceCreateInfo fenceInfo = {
 			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 			.pNext = nullptr,
@@ -1086,7 +1144,7 @@ int importAHardwareBufferAsTexture(AHardwareBuffer *hardwareBuffer) {
 		vkFreeCommandBuffers(device.device_, cmdPool, 1, &gfxCmd);
 		vkDestroyCommandPool(device.device_, cmdPool, nullptr);
 
-
+		DLOGD( "%s,%d begin blit done \r\n", __func__, __LINE__);
 	}
 #endif
 
@@ -1113,6 +1171,7 @@ int importAHardwareBufferAsTexture(AHardwareBuffer *hardwareBuffer) {
 			.flags = 0,
 			};
 		viewCreateInfo.image = importTexture.image_;
+		viewCreateInfo.format = bufferFormatProperties.format;
 		CALL_VK(vkCreateImageView(device.device_, &viewCreateInfo, nullptr, &importTexture.imageView_));
 	}
 
@@ -1159,11 +1218,11 @@ int importAHardwareBufferAsTexture(AHardwareBuffer *hardwareBuffer) {
 		.pTexelBufferView = nullptr};
 	vkUpdateDescriptorSets(device.device_, 1, &writeDst, 0, nullptr);
 
-	fprintf(stderr, "%s done! \r\n", __func__);
+	DLOGD( "%s done! \r\n", __func__);
 	return 0;
 }
 void DeleteImportTexture(int flags) {
-	fprintf(stderr, "%s ... \r\n", __func__);
+	DLOGD( "%s ... \r\n", __func__);
 	if (importTexture.image_ != VK_NULL_HANDLE) {
 		vkDestroyImage(device.device_,importTexture.image_, nullptr);
 		importTexture.image_ = VK_NULL_HANDLE;
@@ -1182,10 +1241,11 @@ void DeleteImportTexture(int flags) {
 			importTexture.sampler_ = VK_NULL_HANDLE;
 		}
 	}
-	fprintf(stderr, "%s done! \r\n", __func__);
+	DLOGD( "%s done! \r\n", __func__);
 }
 
 // A helper function
+static
 bool MapMemoryTypeToIndex(uint32_t typeBits, VkFlags requirements_mask,
                           uint32_t* typeIndex) {
   VkPhysicalDeviceMemoryProperties memoryProperties;
@@ -1206,11 +1266,23 @@ bool MapMemoryTypeToIndex(uint32_t typeBits, VkFlags requirements_mask,
 }
 
 // Create our vertex buffer
+static
 bool CreateBuffers(void) {
   // Vertex positions
   const float vertexData[] = {
-      -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f,
-      1.0f,  0.0f,  0.0f, 1.0f, 0.0f, 0.5f, 1.0f,
+#if 1
+	-1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 
+	1.0f, -1.0f, 0.0f, 1.0f, 0.0f,	
+	-1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+
+	-1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+	1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+	1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+#else
+      -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 
+	  1.0f, -1.0f, 0.0f, 1.0f, 0.0f,  
+	  0.0f, 1.0f, 0.0f, 0.5f, 1.0f,
+#endif
   };
 
   // Create a vertex buffer
@@ -1258,12 +1330,13 @@ bool CreateBuffers(void) {
       vkBindBufferMemory(device.device_, buffers.vertexBuf_, deviceMemory, 0));
   return true;
 }
-
+static
 void DeleteBuffers(void) {
   vkDestroyBuffer(device.device_, buffers.vertexBuf_, nullptr);
 }
 
 // Create Graphics Pipeline
+static
 VkResult CreateGraphicsPipeline(void) {
   memset(&gfxPipeline, 0, sizeof(gfxPipeline));
 
@@ -1475,7 +1548,7 @@ VkResult CreateGraphicsPipeline(void) {
 
   return pipelineResult;
 }
-
+static
 void DeleteGraphicsPipeline(void) {
   if (gfxPipeline.pipeline_ == VK_NULL_HANDLE) return;
   vkDestroyPipeline(device.device_, gfxPipeline.pipeline_, nullptr);
@@ -1485,10 +1558,11 @@ void DeleteGraphicsPipeline(void) {
   vkDestroyDescriptorPool(device.device_, gfxPipeline.descPool_, nullptr);
 
   vkDestroyPipelineLayout(device.device_, gfxPipeline.layout_, nullptr);
-  vkDestroyDescriptorSetLayout(device.device_, gfxPipeline.dscLayout_, nullptr);  // frankie, add, if necessary !
+  vkDestroyDescriptorSetLayout(device.device_, gfxPipeline.dscLayout_, nullptr); // frankie, add, if necessary !
 }
 
 // initialize descriptor set
+static
 VkResult CreateDescriptorSet(void) {
   const VkDescriptorPoolSize type_count = {
       .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -1695,7 +1769,7 @@ bool InitVulkan(android_app_* app) {
                            &buffers.vertexBuf_, &offset);
 
     // Draw Triangle
-    vkCmdDraw(render.cmdBuffer_[bufferIndex], 3, 1, 0, 0);
+	vkCmdDraw(render.cmdBuffer_[bufferIndex], 6, 1, 0, 0);
 
     vkCmdEndRenderPass(render.cmdBuffer_[bufferIndex]);
 	
@@ -1740,7 +1814,7 @@ bool IsVulkanReady(void) { return device.initialized_; }
 
 void DeleteVulkan() {
   LOGW("%s ...", __func__);
-  fprintf(stderr, "%s ... \r\n", __func__);
+  DLOGD( "%s ... \r\n", __func__);
 
 	vkDestroySemaphore(device.device_, render.semaphore_, nullptr);
 	vkDestroyFence(device.device_, render.fence_, nullptr);
@@ -1765,19 +1839,21 @@ void DeleteVulkan() {
   
   DeleteSwapChain();
   
-  vkDestroyRenderPass(device.device_, render.renderPass_, nullptr);
-  
 	DeleteVulkanDevice();
 
   device.initialized_ = false;
 
   LOGW("%s done! ", __func__);
-  fprintf(stderr, "%s done \r\n", __func__);
+  DLOGD( "%s done \r\n", __func__);
 }
 
 // Draw one frame
+
+#define WAIT_TIMEOUT_millis(m) (m*1000*1000)
+	// when using camera,  100ms is not enought for vkWaitForFences() timeout
+
 bool VulkanDrawFrame(void) {
-	fprintf(stderr, "%s ... \r\n", __func__);
+	DLOGD( "%s ... \r\n", __func__);
   uint32_t nextIndex;
   // Get the framebuffer index we should draw in
   CALL_VK(vkAcquireNextImageKHR(device.device_, swapchain.swapchain_,
@@ -1802,7 +1878,7 @@ bool VulkanDrawFrame(void) {
                               .pSignalSemaphores = nullptr};
   CALL_VK(vkQueueSubmit(device.queue_, 1, &submit_info, render.fence_));
   CALL_VK(
-      vkWaitForFences(device.device_, 1, &render.fence_, VK_TRUE, 100000000));
+      vkWaitForFences(device.device_, 1, &render.fence_, VK_TRUE, WAIT_TIMEOUT_millis(1000))); // in units of nanoseconds.
 
   LOGI("Drawing frames......");
 
@@ -1819,14 +1895,13 @@ bool VulkanDrawFrame(void) {
   };
   vkQueuePresentKHR(device.queue_, &presentInfo);
 
-  fprintf(stderr, "%s done! \r\n", __func__);
+  DLOGD( "%s done! \r\n", __func__);
   return true;
 }
 
-void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
+static void setImageLayout(VkCommandBuffer cmdBuffer, VkImage image,
                     VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
-                    VkPipelineStageFlags srcStages,
-                    VkPipelineStageFlags destStages) {
+                    VkPipelineStageFlags srcStages, VkPipelineStageFlags destStages) {
   VkImageMemoryBarrier imageMemoryBarrier = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .pNext = NULL,

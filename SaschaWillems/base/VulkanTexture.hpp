@@ -90,7 +90,7 @@ namespace vks
 			bool forceLinear = false)
 		{
 #if defined(__ANDROID__)
-			fprintf(stderr, "Texture2D::%s, filename:%s \r\n", __func__, filename.c_str());
+			DLOGD( "Texture2D::%s, filename:%s \r\n", __func__, filename.c_str());
 			// Textures are stored inside the apk on Android (compressed)
 			// So they need to be loaded via the asset manager
 			AAsset* asset = AAssetManager_open(androidApp->activity->assetManager, filename.c_str(), AASSET_MODE_STREAMING);
@@ -571,7 +571,7 @@ namespace vks
 			VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 		{
 #if defined(__ANDROID__)
-			fprintf(stderr, "Texture2DArray::%s, filename:%s \r\n", __func__, filename.c_str());
+			DLOGD( "Texture2DArray::%s, filename:%s \r\n", __func__, filename.c_str());
 			// Textures are stored inside the apk on Android (compressed)
 			// So they need to be loaded via the asset manager
 			AAsset* asset = AAssetManager_open(androidApp->activity->assetManager, filename.c_str(), AASSET_MODE_STREAMING);
@@ -784,7 +784,7 @@ namespace vks
 			VkImageLayout imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 		{
 #if defined(__ANDROID__)
-			fprintf(stderr, "TextureCubeMap::%s, filename:%s \r\n", __func__, filename.c_str());
+			DLOGD( "TextureCubeMap::%s, filename:%s \r\n", __func__, filename.c_str());
 			// Textures are stored inside the apk on Android (compressed)
 			// So they need to be loaded via the asset manager
 			AAsset* asset = AAssetManager_open(androidApp->activity->assetManager, filename.c_str(), AASSET_MODE_STREAMING);

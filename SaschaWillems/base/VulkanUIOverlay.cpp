@@ -12,6 +12,11 @@
 #include "AAssetManagerImpl_.h"	// frankie, add
 #endif
 
+#include "utils/football_debugger.h"
+
+#undef __CLASS__
+#define __CLASS__ "UIOverlay"
+
 namespace vks 
 {
 	UIOverlay::UIOverlay()
@@ -27,7 +32,7 @@ namespace vks
 			scale = 2.0f;
 		};
 #endif
-		fprintf(stderr, "%s, scale = %f \r\n", __func__, scale);
+		DLOGD( "%s, scale = %f \r\n", __func__, scale);
 
 		// Init ImGui
 		ImGui::CreateContext();

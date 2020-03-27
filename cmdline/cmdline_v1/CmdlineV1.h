@@ -1,15 +1,6 @@
 #ifndef __CMDLINE_V1_H__
 #define __CMDLINE_V1_H__
 
-#if 0
-#include <utils/RefBase.h>
-#include <utils/Log.h>
-#include <utils/misc.h>
-#include <utils/List.h>
-#include <utils/String8.h>
-#include <utils/KeyedVector.h>
-#endif
-
 #include "CmdLine.h"
 
 #define CMDLINE_TOOL_VERSION "v1.0.0"
@@ -29,10 +20,13 @@ public:
 	CmdlineV1();
 	virtual ~CmdlineV1() override ;
 	virtual void setPrompt(const char *prompt) override ;
-	virtual void addEmptyCmdCallback(PF_empty_cmd_cb cb, void *ctx) override;
-	virtual void onEmptyCmd() override;
+	virtual void add_on_empty_cmd(PF_on_empty_cmd cb, void *ctx) override;
+	virtual void add_on_intercept_command(PF_on_intercept_command pf, void *ctx) override;
+	virtual void on_empty_cmd_i() override;
 	virtual int add(const char * cmd, const char * desc, int (*handler)(void *, int, char * const*), void *ctx) override ;
 	virtual int loop() override ;
+	virtual int check_command_matched(const char * cmd, const char *matched_) override;
+	virtual int postCommand(const char * cmd) override;
 	virtual int runCommand(const char * cmd) override;
 
 	void *impl1 = nullptr;

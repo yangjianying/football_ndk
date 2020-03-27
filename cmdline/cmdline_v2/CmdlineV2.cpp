@@ -3,10 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+#include "utils/football_debugger.h"
+
 #include "cli.h"
 
 #include "CmdlineV2.h"
 #include "cmdline_v1/MenuV1.h"
+
+#undef __CLASS__
+#define __CLASS__ "CmdlineV2"
 
 namespace android {
 
@@ -24,6 +30,9 @@ public:
 	~cli_impl() {
 	}
 
+	virtual int cli_intercept_command_repeatable(const char *cmd, int flag) override {
+		return 0;
+	}
 	virtual int cli_cmd_process_(int flag, int argc, char * const argv[],
 			       int *repeatable, ulong *ticks) override {
 		if (pCmdlineV2 != nullptr) {
@@ -40,7 +49,7 @@ public:
 	CmdlineV2 *pCmdlineV2 = nullptr;
 };
 
-CmdlineV2::CmdlineV2() {
+CmdlineV2::CmdlineV2(int opt_):  Cmdline(opt_)  {
 	impl1 = (void *)new cli_impl(this);
 	menu_impl = (void*) new ::NS_cmdline_v1::NS_menu_v1::MenuV1();
 }
@@ -56,12 +65,16 @@ void CmdlineV2::setPrompt(const char *prompt)  {
 	addInternalCmd();
 	::NS_cmdline_v1::NS_menu_v1::MenuV1 *menu = (::NS_cmdline_v1::NS_menu_v1::MenuV1 *)menu_impl;
 	menu->setPrompt(prompt);
+	mPrompt = std::string(prompt);
 }
-void CmdlineV2::addEmptyCmdCallback(PF_empty_cmd_cb cb, void *ctx) {
-	mEmptyCmdCallback = cb;
-	mEmptyCmdCallback_ctx = ctx;
+void CmdlineV2::add_on_empty_cmd(PF_on_empty_cmd cb, void *ctx) {
+	mPF_on_empty_cmd = cb;
+	mPF_on_empty_cmd_ctx = ctx;
 }
-void CmdlineV2::onEmptyCmd() {
+void CmdlineV2::add_on_intercept_command(PF_on_intercept_command, void *ctx) {
+
+}
+void CmdlineV2::on_empty_cmd_i() {
 }
 
 int CmdlineV2::add(const char * cmd, const char * desc, int (*handler)(void *, int, char * const *), void *ctx)  {
@@ -71,8 +84,15 @@ int CmdlineV2::add(const char * cmd, const char * desc, int (*handler)(void *, i
 }
 int CmdlineV2::loop()  {
 	cli_impl *_impl = (cli_impl*)impl1;
-	_impl->cli_loop();
+	_impl->cli_loop(mPrompt.c_str());
 	return 0;
+}
+int CmdlineV2::check_command_matched(const char * cmd, const char *matched_) {
+	cli_impl *_impl = (cli_impl*)impl1;
+	return _impl->check_cli_command_matched(cmd, matched_);
+}
+int CmdlineV2::postCommand(const char * cmd) {
+	return -1;
 }
 int CmdlineV2::runCommand(const char * cmd) {
 	cli_impl *_impl = (cli_impl*)impl1;
@@ -86,9 +106,11 @@ void CmdlineV2::addInternalCmd() {
 		::NS_cmdline_v1::NS_menu_v1::MenuV1 *menu = (::NS_cmdline_v1::NS_menu_v1::MenuV1 *)menu_impl;
 		//menu->menuConfig(STR_C11_LITERAL("clversion"), 
 		//	STR_C11_LITERAL("cmdline tool " CMDLINE_TOOL_VERSION "(Based on Linux 3.18.6)"),NULL, NULL);
-		menu->menuConfig(STR_C11_LITERAL("clversion"), 
+		menu->menuConfig(STR_C11_LITERAL(kCmd_clversion), 
 			STR_C11_LITERAL("cmdline tool " CMDLINE_TOOL_VERSION),NULL, NULL);
-		menu->menuConfig(STR_C11_LITERAL("quit"),
+		menu->menuConfig(STR_C11_LITERAL(kCmd_quit),
+			STR_C11_LITERAL("Quit from cmdline tool"), __quit, NULL);
+		menu->menuConfig(STR_C11_LITERAL(kCmd_q_),
 			STR_C11_LITERAL("Quit from cmdline tool"), __quit, NULL);
 
 	}
@@ -100,11 +122,11 @@ int CmdlineV2::cli_cmd_process_(int flag, int argc, char * const argv[],
    CLI_UNUSED_(argv);
    CLI_UNUSED_(repeatable);
    CLI_UNUSED_(ticks);
-   	//fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+   	//DLOGD( "%s,%d \r\n", __func__, __LINE__);
 #if 0
-   	printf("%s, %d argc: %d \r\n", __func__, __LINE__, argc);
+   	DLOGD("%s, %d argc: %d \r\n", __func__, __LINE__, argc);
 	for(int i=0;i<argc;i ++) {
-		printf("%04d, (%s)\r\n", i, argv[i]);
+		DLOGD("%04d, (%s)\r\n", i, argv[i]);
 	}
 #endif
 	if (menu_impl != NULL) {
@@ -115,9 +137,11 @@ int CmdlineV2::cli_cmd_process_(int flag, int argc, char * const argv[],
 
 }
 void CmdlineV2::cli_cmd_empty_() {
-	onEmptyCmd();
-	if (mEmptyCmdCallback != nullptr) {
-		mEmptyCmdCallback(mEmptyCmdCallback_ctx);
+	if (mPF_on_empty_cmd != nullptr) {
+		mPF_on_empty_cmd(mPF_on_empty_cmd_ctx);
+	}
+	else {
+		on_empty_cmd_i();
 	}
 }
 

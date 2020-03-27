@@ -13,13 +13,18 @@
 
 #include "FootballConfig.h"
 
-#include "ndk_extend/NativeHooApi.h"
+#include "utils/ANativeWindowUtils.h"
+#include "utils/StbImage_.h"
+#include "utils/foot_utils.h"
 
-#include "ANativeWindowUtils.h"
-#include "StbImage_.h"
+
+#include "standalone/StbImageUtils.h"
 
 #include "FootballPPFactory.h"
 #include "FootballPPTester.h"
+
+#undef __CLASS__
+#define __CLASS__ "FootballPPTester"
 
 using namespace std;
 
@@ -59,20 +64,20 @@ public:
 	int mFileIndex = -1;
 
 	FileManager_(const char *directory_) {
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+		DLOGD( "%s,%d \r\n", __func__, __LINE__);
 		setDirectory(directory_);
 	}
 	~FileManager_() {
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+		DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	}
 	int setDirectory(const char *directory_) {
 		mDirectory = directory_;
 		if (directory_ != nullptr && directory_[strlen(directory_) - 1] == '/') {
 			mDirectory = mDirectory.substr(0, strlen(directory_) - 1);
 		}
-		fprintf(stderr, "%s, mDirectory:%s \r\n", __func__, mDirectory.c_str());
+		DLOGD( "%s, mDirectory:%s \r\n", __func__, mDirectory.c_str());
 		int ret = rescan();
-		fprintf(stderr, "%s, mFileList.size() = %zd \r\n", __func__, mFileList.size());
+		DLOGD( "%s, mFileList.size() = %zd \r\n", __func__, mFileList.size());
 		return ret;
 	}
 	const char* getDirectory() {
@@ -81,18 +86,18 @@ public:
 	int rescan() {
 		mFileList.clear();
 		mFileIndex = -1;
-		fprintf(stderr, "%s, mDirectory:%s \r\n", __func__, mDirectory.c_str());
+		DLOGD( "%s, mDirectory:%s \r\n", __func__, mDirectory.c_str());
 		int ret = rescan(mDirectory);
-		fprintf(stderr, "%s, mFileList.size() = %zd \r\n", __func__, mFileList.size());
+		DLOGD( "%s, mFileList.size() = %zd \r\n", __func__, mFileList.size());
 		return ret;
 	}
 	int rescan(string directory_) {
-		//fprintf(stderr, "%s, directory_:%s \r\n", __func__, directory_.c_str());
+		//DLOGD( "%s, directory_:%s \r\n", __func__, directory_.c_str());
 
 		DIR *dirptr = NULL;
 		struct dirent *entry = nullptr;
 		if ((dirptr = opendir(directory_.c_str())) == NULL) {
-			fprintf(stderr, "%s,%d error! \r\n", __func__, __LINE__);
+			DLOGD( "%s,%d error! \r\n", __func__, __LINE__);
 			return -1;
 		}
 		entry = readdir(dirptr);
@@ -131,7 +136,7 @@ public:
 		if (mFileIndex >= mFileList.size()) {
 			mFileIndex = 0;
 		}
-		fprintf(stderr, "mFileIndex:%d \r\n", mFileIndex);
+		DLOGD( "mFileIndex:%d \r\n", mFileIndex);
 		string r = mFileList[mFileIndex];
 		return r;
 	}
@@ -147,7 +152,7 @@ public:
 				mFileIndex = mFileList.size() -1;
 			}
 		}
-		fprintf(stderr, "mFileIndex:%d \r\n", mFileIndex);
+		DLOGD( "mFileIndex:%d \r\n", mFileIndex);
 		string r = mFileList[mFileIndex];
 		return r;
 	}
@@ -158,7 +163,7 @@ public:
 		if(mFileIndex < 0) { // in case the first time , use index = 0
 			mFileIndex = 0;
 		} 
-		fprintf(stderr, "mFileIndex:%d \r\n", mFileIndex);
+		DLOGD( "mFileIndex:%d \r\n", mFileIndex);
 		string r = mFileList[mFileIndex];
 		return r;
 	}
@@ -168,149 +173,8 @@ public:
 };
 
 /////////////////////////////////////
-TestReader::TestReader(int width, int height, int format, int maxImages, uint64_t usage) {
-	fprintf(stderr, "%s,%d ...\r\n", __func__, __LINE__);
 
-	// setup AImageReader_ImageListener
-	context = (void *)this; onImageAvailable = s_TestReader_AImageReader_ImageCallback;
 
-	AImageReader *reader_ = nullptr;
-	//media_status_t ret = AImageReader_new(width, height, format, maxImages, &reader_);
-	media_status_t ret = AImageReader_newWithUsage(width, height, format, usage, maxImages, &reader_);
-	if (ret == AMEDIA_OK && reader_ != nullptr) {
-		mReader = reader_;
-		AImageReader_setImageListener(mReader, this);
-		fprintf(stderr, "%s,%d ok! \r\n", __func__, __LINE__);
-	}
-	else {
-		fprintf(stderr, "%s,%d failed! \r\n", __func__, __LINE__);
-	}
-}
-TestReader::~TestReader() {
-	fprintf(stderr, "%s,%d destroying ... \r\n", __func__, __LINE__);
-	if (mReader != nullptr) {
-		// wait onImageAvailable to be executed !!! or if there's existing Image , will result error !
-		// close: parent AImageReader closed without releasing image 0x7967bf7400
-
-		{
-			std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-			destroyed = 1;
-			
-			AImageReader_setImageListener(mReader, nullptr);
-			
-			while(cb_is_ongoing) {
-				fprintf(stderr, "cb_is_ongoing == 1 wait ...\r\n");
-				caller_cv_.wait(caller_lock);
-			}
-			AImage *image_ = nullptr;
-			media_status_t ret = AImageReader_acquireLatestImage(mReader, &image_);
-			while (ret == AMEDIA_OK && image_ != nullptr) {
-				fprintf(stderr, "still have image, delete ...\r\n");
-				AImage_delete(image_);
-				ret = AImageReader_acquireLatestImage(mReader, &image_);
-			}
-		}
-		AImageReader_delete(mReader);
-	}
-	fprintf(stderr, "%s,%d destroyed. \r\n", __func__, __LINE__);
-}
-ANativeWindow *TestReader::getANativeWindow() {
-	if (mReader != nullptr) {
-		int ret;
-		ANativeWindow *window_ = nullptr;
-		ret = AImageReader_getWindow(mReader, &window_);
-		if (ret == AMEDIA_OK && window_ != nullptr) {
-			return window_;
-		}
-	}
-	fprintf(stderr, "%s,%d return nullptr \r\n", __func__, __LINE__);
-	return nullptr;
-}
-
-void TestReader::notify_cb_ongoing(int ongoing_) {
-	std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-	cb_is_ongoing = ongoing_;
-	caller_cv_.notify_one();
-}
-
-// this waill wakeup waitData !
-void TestReader::incFrameNumber() {
-	mFrameIndex++;
-}
-void TestReader::onImageAvailableCallback(AImageReader *reader) {
-	std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-	if (destroyed) {
-		fprintf(stderr, "%s,%d destroyed skip !!! \r\n", __func__, __LINE__);
-		return ;
-	}
-	fprintf(stderr, "TestReader::%s,%d frame: %ld tid:%lu \r\n", __func__, __LINE__, mFrameIndex, pthread_self());
-
-	cb_is_ongoing = 1; // notify_cb_ongoing(1);
-
-	AImage *image_ = nullptr;
-	media_status_t ret = AImageReader_acquireLatestImage(reader, &image_);
-	if (ret == AMEDIA_OK && image_ != nullptr) {
-		int32_t img_width_ = 0;
-		int32_t img_height_ = 0;
-		int32_t img_format_ = 0;
-		int64_t img_timestampNs_ = 0;
-		int32_t img_numPlanes_ = 0;
-		AImage_getWidth(image_, &img_width_);
-		AImage_getHeight(image_, &img_height_);
-		AImage_getFormat(image_, &img_format_);
-		AImage_getTimestamp(image_, &img_timestampNs_);
-		AImage_getNumberOfPlanes(image_, &img_numPlanes_);
-		fprintf(stderr, "  TestReader image:%04dx%04d format:%08x numPlanes:%d \r\n",
-			img_width_, img_height_, img_format_, img_numPlanes_);
-		for(int planeIndex = 0;planeIndex<img_numPlanes_;planeIndex++) {
-			int32_t pixelStride_ = 0;
-			int32_t rowStride_ = 0;
-			uint8_t * data_ = nullptr;
-			int dataLength_ = 0;
-			ret = AImage_getPlanePixelStride(image_, planeIndex, &pixelStride_);
-				if (ret != AMEDIA_OK) { fprintf(stderr, "    AImage_getPlanePixelStride failed \r\n"); }
-			ret = AImage_getPlaneRowStride(image_, planeIndex, &rowStride_);
-				if (ret != AMEDIA_OK) { fprintf(stderr, "    AImage_getPlaneRowStride failed \r\n"); }
-			ret = AImage_getPlaneData(image_, planeIndex, &data_, &dataLength_);
-				if (ret != AMEDIA_OK) { fprintf(stderr, "    AImage_getPlaneData failed \r\n"); }
-			fprintf(stderr, "    TestReader,  plane:%01d pixelStride:%05d rowStride:%05d dataLength:%d \r\n",
-				planeIndex, pixelStride_, rowStride_, dataLength_);
-		}
-	
-		AImage_delete(image_);
-	}
-	incFrameNumber();
-
-	cb_is_ongoing = 0; // notify_cb_ongoing(0);
-	caller_cv_.notify_one();
-
-}
-
-// wait until mFrameIndex >= frameIndex !
-int TestReader::waitFrame(long frameIndex, long timeout_ms) {
-	fprintf(stderr, "wait frame expect:%ld / current: %ld timeout:%lu tid:%lu \r\n",
-		frameIndex, mFrameIndex, timeout_ms, pthread_self());
-	long time_ms_cnt = 0;
-	while (mFrameIndex < frameIndex) {
-		usleep(1*1000);
-		if (timeout_ms > 0) {
-			time_ms_cnt++;
-			if (time_ms_cnt >= timeout_ms) {
-				fprintf(stderr, "wait frame timeout! \r\n");
-				break;
-			}
-		}
-	}
-	fprintf(stderr, "%s done! \r\n", __func__);
-	return 0;
-}
-
-/*static*/ void TestReader::s_TestReader_AImageReader_ImageCallback(void* context, AImageReader* reader) {
-	if (context != nullptr) {
-		TestReader *testReader = (TestReader*)context;
-		testReader->onImageAvailableCallback(reader);
-	}
-}
 
 /////////////////////////////////////
 
@@ -319,15 +183,13 @@ public:
 	FootballBlController *bl_controller__ = nullptr;
 	BacklightDataReader(FootballBlController *bl_controller, int width, int height, int format, int maxImages = 3)
 		:TestReader(width, height, format, maxImages), bl_controller__(bl_controller) {
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+		DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	}
 	virtual ~BacklightDataReader() {
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+		DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	}
-	virtual void onImageAvailableCallback(AImageReader *reader) {
-		//TestReader::onImageAvailableCallback(reader);
-		
-		fprintf(stderr, "BacklightDataReader::%s,%d frame: %ld tid:%lu \r\n", __func__, __LINE__, mFrameIndex, pthread_self());
+	virtual void onImageAvailableCallback_2_l(AImageReader *reader) override {
+		DLOGD( ">>>BacklightDataReader::%s,%d frame: %ld tid:%lu \r\n", __func__, __LINE__, getFrameIndex(), pthread_self());
 		AImage *image_ = nullptr;
 		media_status_t ret = AImageReader_acquireLatestImage(reader, &image_);
 		if (ret == AMEDIA_OK && image_ != nullptr) {
@@ -335,8 +197,9 @@ public:
 			AImageData *imageData = getAImageData_from_AImage(image_);
 			AImage_delete(image_);
 			if (imageData != nullptr) {
-				imageData->print_as_uint32();
-
+				
+				//imageData->print_as_uint32();
+			#if 0
 				if (bl_controller__ != nullptr) {
 					for(int y=0;y<imageData->height;y++) {
 						for(int x=0;x<imageData->width;x++) {
@@ -348,120 +211,177 @@ public:
 					}
 					bl_controller__->backlightCommit();
 				}
+			#endif
 
 				delete imageData;
 			}
 		}
-		incFrameNumber();
+
 
 	}
 
 };
+
+#define FINAL_SAVE_DIR "/sdcard/data/final_image"
 class FinalImageReader : public TestReader {
 public:
 	FinalImageReader(int width, int height, int format, int maxImages = 3)
 		:TestReader(width, height, format, maxImages) {
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+		DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	}
 	virtual ~FinalImageReader() {
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+		DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	}
-	virtual void onImageAvailableCallback(AImageReader *reader) {
-		//TestReader::onImageAvailableCallback(reader);
-		
-		fprintf(stderr, "FinalImageReader::%s,%d frame: %ld tid:%lu \r\n", __func__, __LINE__, mFrameIndex, pthread_self());
+	virtual void onImageAvailableCallback_2_l(AImageReader *reader) override {
+		DLOGD( ">>>FinalImageReader::%s,%d frame: %ld tid:%6lu \r\n", __func__, __LINE__, getFrameIndex(), pthread_self());
 		AImage *image_ = nullptr;
 		media_status_t ret = AImageReader_acquireLatestImage(reader, &image_);
 		if (ret == AMEDIA_OK && image_ != nullptr) {
+			AImageAndroidInfo info;
+			getAImageAndroidInfo(image_, &info);
+			printAImageAndroidInfo("FinalImageReader : ", info);
+			
+#if 1
+			if (info.format == AIMAGE_FORMAT_RGBA_8888 && info.numPlanes == 1)
+			{
+				if (football::utils::CheckFile::exist(FINAL_SAVE_DIR)) {
+					// /sdcard/data/
+					char path_[256] = {0};
+					snprintf(path_, 255, FINAL_SAVE_DIR "/frame_%06lu.png", getFrameIndex());
+					int n = 4;
+					vk___stbi_write_png(path_, info.width, info.height, n, info.planes[0].data_, info.planes[0].rowStride_);
+					DLOGD( "saving done! \r\n");
+				} else {
+					DLOGD( "%s not exist ! \r\n", FINAL_SAVE_DIR);
+				}
+			}
+			else {
+				DLOGD( "format not support save into file ! \r\n");
+			}
+#endif
+
+		
 			AImage_delete(image_);
 		}
-		incFrameNumber();
-
+		
 	}
 
 };
 
 /////////////////////////////////////
 
+IMPL_SessionInfo_on_frame(FootballPPTester, on_frame_);
+
+
 // FootballPPTester
-FootballPPTester::FootballPPTester(FootballBlController *bl_controller, int source_type_):
-	mFootballBlController(bl_controller), source_type(source_type_) {
-	fprintf(stderr, "FootballPPTester::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
+FootballPPTester::FootballPPTester(
+	FootballBlController *bl_controller, int pp_type_, int pp_sub_type, int source_type_, int sink_type):
+	mFootballBlController(bl_controller), 
+	mPPType(pp_type_), 
+	mPPSessionType(pp_sub_type), 
+	source_type(source_type_), 
+	mSinkType(sink_type) {
+
+	DLOGD( "FootballPPTester::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
 
 	virtual_display_source_ready = 0;
 
-	mTargetWidth = 1080;
-	mTargetHeight = 1920; // 2340; // 1920;
+	mTargetWidth = FootballPPTester_window_width;
+	mTargetHeight = FootballPPTester_window_height;
 	mBlDataWidth = 15;
 	mBlDataHeight = 31;
 
 	int width = mTargetWidth;
 	int height = mTargetHeight;
 
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 
 	int type_ = FootballPPFactory::PP_CPU;
 	type_ = FootballPPFactory::PP_VK;
+	type_ = mPPType;
 	mFootballPP = FootballPPFactory::createFootballPP(type_);
 
 	// init a session
-	int ret = 0;
+	mSessionInfo._on_frame_set(
+		SessionInfo_on_frame_s_func(on_frame_), this);
 	
 	//	  AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM 		  = 1,
-	ret = ANativeHooSurface_create(FootballPPTester_special_SURFACE_NAME, width, height, 0x01, 0, &mHooSurface);
-	if (ret != 0 || mHooSurface == nullptr) {
-		fprintf(stderr, "%s,%d error! \r\n", __func__, __LINE__);
+
+	ANativeWindow *surface_window_ = nullptr;
+
+	if (mSinkType == SINK_SURFACE)
+	{
+		std::unique_lock<std::mutex> caller_lock(mHooSurface_mutex_);
+		int ret = 0;
+/** frankie, note, here if not use ANativeHoo_ISurfaceComposerClient_eOpaque flag, the UI will be transparent , this is abnormal !!! */
+		ret = ANativeHooSurface_create(FootballPPTester_special_SURFACE_NAME, width, height, AIMAGE_FORMAT_RGBA_8888, 
+			ANativeHoo_ISurfaceComposerClient_eHidden
+			| ANativeHoo_ISurfaceComposerClient_eOpaque
+			,
+			&mHooSurface);
+		if (ret != 0 || mHooSurface == nullptr) {
+			DLOGD( "%s,%d error! \r\n", __func__, __LINE__);
+		}
+		if(mHooSurface != nullptr) {
+		   ANativeHooSurface_getWindow(mHooSurface, &surface_window_);
+		   if (surface_window_ == nullptr) {
+			   ANativeHooSurface_destroy(mHooSurface);
+			   mHooSurface = nullptr;
+		   }
+		}
 	}
-	if(mHooSurface != nullptr) {
-	   ANativeWindow *surface_window_ = nullptr;
-	   ANativeHooSurface_getWindow(mHooSurface, &surface_window_);
-	   if (surface_window_ != nullptr) {
-		   mSession.final_image = surface_window_;
-	   }
-	   else {
-		   ANativeHooSurface_destroy(mHooSurface);
-		   mHooSurface = nullptr;
-	   }
-	}
-	
-	if (mSession.final_image == nullptr) {
+	mSessionInfo.final_image = surface_window_;
+
+	if (mSinkType == SINK_IMAGE_READER || mSessionInfo.final_image == nullptr) {
+/** when render into cpu reader, the UI will be abnormal , as its transparency !!! */
 		mFinalImageReader = new FinalImageReader(width, height, AIMAGE_FORMAT_RGBA_8888);
-		mSession.final_image = mFinalImageReader->getANativeWindow();
+		mSessionInfo.final_image = mFinalImageReader->getANativeWindow();
 	}
-	if (mSession.final_image == nullptr) {
-		fprintf(stderr, "### %s,%d no target final image setup! ### \r\n", __func__, __LINE__);
+	if (mSessionInfo.final_image == nullptr) {
+		DLOGD( "### %s,%d no target final image setup! ### \r\n", __func__, __LINE__);
 		abort();
 	}
 	
 	mBlDataReader = new BacklightDataReader(bl_controller, mBlDataWidth, mBlDataHeight, AIMAGE_FORMAT_RGBA_8888);
-	mSession.backlight_data = mBlDataReader->getANativeWindow();
+	mSessionInfo.backlight_data = mBlDataReader->getANativeWindow();
 
 	// build session
-	ret = mFootballPP->buildSession(&mSession, &mSessionId);
-	fprintf(stderr, "buildSession ret = %d id = %d \r\n", ret, mSessionId);
-
+{
+	int ret = mFootballPP->buildSession(mPPSessionType, mSessionInfo, &mSessionId);
+	DLOGD( "buildSession ret = %d id = %d \r\n", ret, mSessionId);
+}
+	if (mFinalImageReader != nullptr) {
+		mFinalImageReader->resetFrameIndex(mFrameIndex);
+	}
 	mFileManager_ = new FileManager_(FootballPPTester_FileManager_DEFAULT_PATH);
 	string file_ = mFileManager_->nextFile();
-	fprintf(stderr, "file_:%s \r\n", file_.c_str());
+	DLOGD( "file_:%s \r\n", file_.c_str());
 	mFileManager_->resetFileIndex();
 
 }
 FootballPPTester::~FootballPPTester() {
+
+	// destroy session first, this stop the render into reader/surface !!
+	if (mSessionId >= 0) {
+		mFootballPP->closeSession(mSessionId);
+	}
+
 	if (mNativeHooDisplay != nullptr) {  // must first destroy display source !!!
 		ANativeHooDisplay_destroy(mNativeHooDisplay);
 		mNativeHooDisplay = nullptr;
 	}
-
-	// destroy session
-	if (mSessionId >= 0) {
-		mFootballPP->closeSession(mSessionId);
-	}
 	if (mFinalImageReader != nullptr) {
 		delete mFinalImageReader;
 	}
-	if (mHooSurface != nullptr) {
-		ANativeHooSurface_destroy(mHooSurface);
+
+	{
+		std::unique_lock<std::mutex> caller_lock(mHooSurface_mutex_);
+		if (mHooSurface != nullptr) {
+			ANativeHooSurface_destroy(mHooSurface);
+			mHooSurface = nullptr;
+		}
 	}
+
 	delete mBlDataReader;
 
 	if (mFileManager_ != nullptr) {
@@ -472,7 +392,26 @@ FootballPPTester::~FootballPPTester() {
 	if (mFootballPP != nullptr) {
 		delete mFootballPP;
 	}
-	fprintf(stderr, "FootballPPTester::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
+	DLOGD( "FootballPPTester::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
+}
+void FootballPPTester::on_frame_() {
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
+	{
+		std::unique_lock<std::mutex> caller_lock(mHooSurface_mutex_);
+#define FIRST_FRAME_NUM 1  // (2)
+
+		if (first_few_frame_comming < FIRST_FRAME_NUM) {
+			first_few_frame_comming++;
+			if (first_few_frame_comming >= FIRST_FRAME_NUM) {
+				// until now, show the surface on the screen !!!
+/** frankie, note, it's strange that even the surface is hiden , the screen still show black ! */
+				if (mHooSurface != nullptr) {
+					ANativeHooSurface_show(mHooSurface);
+				}
+				// after the surface shown, then open the layer/display cross arbitration
+			}
+		}
+	}
 }
 
 //
@@ -497,10 +436,10 @@ int FootballPPTester::directoryRescan() {
 }
 int FootballPPTester::process_with_file(const char *filename_, int have_algo) {
 	if (source_type != SOURCE_FILE) {
-		fprintf(stderr, "source type is not FILE !!! \r\n");
+		DLOGD( "source type is not FILE !!! \r\n");
 		return 0;
 	}
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 
 #undef TEST_FRAME_NUM
 #define TEST_FRAME_NUM 1 // (50*10)
@@ -514,10 +453,10 @@ int FootballPPTester::process_with_file(const char *filename_, int have_algo) {
 	for(int frame_no = 0; frame_no < TEST_FRAME_NUM; frame_no++) {
 		mFrameIndex++;
 		
-		fprintf(stderr, "++++++++ producing frame:%ld \r\n", mFrameIndex);
+		DLOGD( "++++++++ producing frame:%ld \r\n", mFrameIndex);
 		//////////////////////////////// fill input_window
 		{
-			ANativeWindow *inputWindow = mSession.input_window;
+			ANativeWindow *inputWindow = mSessionInfo.input_window;
 			//fill_ANativeWindow_with_color(inputWindow, 0xff00ff00);
 
 			StbImage_ *stb_image_ = new StbImage_(filename_, mTargetWidth, mTargetHeight);
@@ -526,17 +465,16 @@ int FootballPPTester::process_with_file(const char *filename_, int have_algo) {
 		}
 		//////////////////////////////// fill done !!!
 	
-		fprintf(stderr, "frame:%ld produced !\r\n", mFrameIndex);
+		DLOGD( "frame:%ld produced !\r\n", mFrameIndex);
 	
 		// wait
 		if (mFinalImageReader != nullptr) {
 			mFinalImageReader->waitFrame(mFrameIndex, 5*1000);
 		}
-		
 		// wait 
 		mBlDataReader->waitFrame(mFrameIndex, 5*1000);
 	
-		fprintf(stderr, "--------- frame:%ld done \r\n", mFrameIndex);
+		DLOGD( "--------- frame:%ld done \r\n", mFrameIndex);
 	}
 	return 0;
 }
@@ -544,8 +482,8 @@ int FootballPPTester::process_with_file(const char *filename_, int have_algo) {
 void FootballPPTester::process_next_file(int num_of_file) {
 	for(int i=0;i<num_of_file;i++) {
 		string file_ = mFileManager_->nextFile();
-		if (file_.empty()) { fprintf(stderr, "filename empty! \r\n");return ;}
-		fprintf(stderr, "******************* num_of_file: %d next file_:%s \r\n", i, file_.c_str());
+		if (file_.empty()) { DLOGD( "filename empty! \r\n");return ;}
+		DLOGD( "******************* num_of_file: %d next file_:%s \r\n", i, file_.c_str());
 		process_with_file(file_.c_str());
 	}
 }
@@ -553,44 +491,43 @@ void FootballPPTester::process_next_file(int num_of_file) {
 void FootballPPTester::process_prev_file(int num_of_file) {
 	for(int i=0;i<num_of_file;i++) {
 		string file_ = mFileManager_->prevFile();
-		if (file_.empty()) { fprintf(stderr, "filename empty! \r\n");return ;}
-		fprintf(stderr, "******************* num_of_file: %d prev file_:%s \r\n", i, file_.c_str());
+		if (file_.empty()) { DLOGD( "filename empty! \r\n");return ;}
+		DLOGD( "******************* num_of_file: %d prev file_:%s \r\n", i, file_.c_str());
 		process_with_file(file_.c_str());
 	}
 }
 void FootballPPTester::process_current_file(int num_of_times, int have_algo) {
 	for(int i=0;i<num_of_times;i++) {
 		string file_ = mFileManager_->currentFile();
-		if (file_.empty()) { fprintf(stderr, "filename empty! \r\n");return ;}
-		fprintf(stderr, "******************* num_of_file: %d current file_:%s \r\n", i, file_.c_str());
+		if (file_.empty()) { DLOGD( "filename empty! \r\n");return ;}
+		DLOGD( "******************* num_of_file: %d current file_:%s \r\n", i, file_.c_str());
 		process_with_file(file_.c_str(), have_algo);
 	}
 }
 
-//
 // 0 close
 // 1 open
 // 2 toggle
 int FootballPPTester::virtual_display_source_setup(int flags) {
 	if (source_type != SOURCE_DISPLAY) {
-		fprintf(stderr, "source type is not virtual display !!! \r\n");
+		DLOGD( "source type is not virtual display !!! \r\n");
 		return 0;
 	}
-	if (virtual_display_source_ready == 0 && (flags == 1 || flags == 2)) {
+	if (virtual_display_source_ready == 0 && (VD_OP_OPEN == 1 || VD_OP_TOGGLE == 2)) {
 		virtual_display_source_ready = 1;
-		ANativeWindow *inputWindow = mSession.input_window;
+		ANativeWindow *inputWindow = mSessionInfo.input_window;
 	
 		ANativeHooDisplay *display_ = nullptr;
 		int ret;
-		fprintf(stderr, "session input size: %4d x %4d \r\n", mSession.width, mSession.height);
+		DLOGD( "session input size: %4d x %4d \r\n", mSessionInfo.width, mSessionInfo.height);
 		ret = ANativeHooDisplay_create(FootballPPTester_special_DISPLAY_NAME,
-			mSession.width, mSession.height, inputWindow, &display_);
-		fprintf(stderr, "ANativeHooDisplay_create ret=%d \r\n", ret);
+			mSessionInfo.width, mSessionInfo.height, inputWindow, &display_);
+		DLOGD( "ANativeHooDisplay_create ret=%d \r\n", ret);
 		if (ret == 0 && display_ != nullptr) {
 			mNativeHooDisplay = display_;
 		}
 
-	} else if (virtual_display_source_ready && (flags == 0 || flags == 2)) {
+	} else if (virtual_display_source_ready && (VD_OP_CLOSE == 0 || VD_OP_TOGGLE == 2)) {
 		virtual_display_source_ready = 0;
 		if (mNativeHooDisplay != nullptr) {
 			ANativeHooDisplay_destroy(mNativeHooDisplay);
@@ -602,6 +539,10 @@ int FootballPPTester::virtual_display_source_setup(int flags) {
 }
 
 //
+int FootballPPTester::setParameter(SessionParameter *parameter) {
+	return mFootballPP->setSessionParameter(mSessionId, parameter);
+}
+
 void FootballPPTester::print() {
 	mFootballPP->print(mSessionId);
 }
@@ -609,22 +550,22 @@ void FootballPPTester::print() {
 
 // initial test
 void FootballPPTester::test() {
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 #define TEST_SESSION_NUM (1)
 
 	for(int i=0;i<TEST_SESSION_NUM;i++) {
-		fprintf(stderr, "-------------------------- test session:%d \r\n", i);
+		DLOGD( "-------------------------- test session:%d \r\n", i);
 		int ret = 0;
 		int session_id = -1;
-		FootSession session;
+		SessionInfo session;
 		TestReader *final_image_reader = nullptr;
 		ANativeHooSurface *hooSurface = nullptr;
 		TestReader *bl_data_reader = nullptr;
 
 		//    AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM           = 1,
-		ret = ANativeHooSurface_create("", 1080, 1920, 0x01, 0, &hooSurface);
+		ret = ANativeHooSurface_create("", 1080, 1920, AIMAGE_FORMAT_RGBA_8888, 0, &hooSurface);
 		if (ret != 0 || hooSurface == nullptr) {
-			fprintf(stderr, "%s,%d error! \r\n", __func__, __LINE__);
+			DLOGD( "%s,%d error! \r\n", __func__, __LINE__);
 			final_image_reader = new FinalImageReader(1080, 1920, AIMAGE_FORMAT_RGBA_8888);
 		}
 		
@@ -642,14 +583,14 @@ void FootballPPTester::test() {
 			session.final_image = final_image_reader->getANativeWindow();
 		}
 		if (session.final_image == nullptr) {
-			fprintf(stderr, "%s,%d no target final image setup! \r\n", __func__, __LINE__);
+			DLOGD( "%s,%d no target final image setup! \r\n", __func__, __LINE__);
 			return ;
 		}
 
 		bl_data_reader = new BacklightDataReader(nullptr, 15, 31, AIMAGE_FORMAT_RGBA_8888);
 		session.backlight_data = bl_data_reader->getANativeWindow();
-		ret = mFootballPP->buildSession(&session, &session_id);
-		fprintf(stderr, "buildSession ret = %d id = %d \r\n", ret, session_id);
+		ret = mFootballPP->buildSession(0, session, &session_id);
+		DLOGD( "buildSession ret = %d id = %d \r\n", ret, session_id);
 
 		if (ret == 0 && session_id >= 0) {
 #undef TEST_FRAME_NUM
@@ -657,7 +598,7 @@ void FootballPPTester::test() {
 			long frame_index = 0;
 			for(int frame_no = 0; frame_no < TEST_FRAME_NUM; frame_no++) {
 				frame_index++;
-				fprintf(stderr, "++++++++ producing frame:%ld \r\n", frame_index);
+				DLOGD( "++++++++ producing frame:%ld \r\n", frame_index);
 				//////////////////////////////// fill input_window
 				{
 					ANativeWindow *inputWindow = session.input_window;
@@ -666,11 +607,11 @@ void FootballPPTester::test() {
 					int32_t width_ = ANativeWindow_getWidth(inputWindow);
 					int32_t height_ = ANativeWindow_getHeight(inputWindow);
 					int32_t format_ = ANativeWindow_getFormat(inputWindow);
-					fprintf(stderr, "fill window size:%04dx%04d format:0x%08x \r\n", width_, height_, format_);
+					DLOGD( "fill window size:%04dx%04d format:0x%08x \r\n", width_, height_, format_);
 
 					ANativeWindow_Buffer lockBuffer;
 					if (ANativeWindow_lock(inputWindow, &lockBuffer, nullptr) == 0) {
-						fprintf(stderr, "    lockBuffer size:%04dx%04d stride:%d \r\n", lockBuffer.width, lockBuffer.height, lockBuffer.stride);
+						DLOGD( "    lockBuffer size:%04dx%04d stride:%d \r\n", lockBuffer.width, lockBuffer.height, lockBuffer.stride);
 						uint32_t *pixel = (uint32_t *)lockBuffer.bits;
 
 					#if 1
@@ -685,7 +626,7 @@ void FootballPPTester::test() {
 				}
 				//////////////////////////////// fill done !!!
 
-				fprintf(stderr, "frame:%ld produced !\r\n", frame_index);
+				DLOGD( "frame:%ld produced !\r\n", frame_index);
 
 				// wait
 				if (final_image_reader != nullptr) {
@@ -695,7 +636,7 @@ void FootballPPTester::test() {
 				// wait 
 				bl_data_reader->waitFrame(frame_index, 0);
 
-				fprintf(stderr, "--------- frame:%ld done \r\n", frame_index);
+				DLOGD( "--------- frame:%ld done \r\n", frame_index);
 			}
 
 			mFootballPP->closeSession(session_id);

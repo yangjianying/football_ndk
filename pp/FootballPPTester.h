@@ -5,49 +5,43 @@
 #include <mutex>
 #include <condition_variable>   // NOLINT
 
-#include "FootballPP.h"
+#include "utils/ANativeWindowUtils.h"
 
-#include "FootballBlController.h"
+#include "pp/FootballPP.h"
+#include "pp/FootballPPFactory.h"
 
-#include "ndk_extend/NativeHooApi.h"
+#include "miniled/FootballBlController.h"
+
+#include "ndk_extend/NativeHooApi_Loader.h"
 
 namespace football {
 
 class FileManager_;
 
-class TestReader: public AImageReader_ImageListener {
-public:
-	static void s_TestReader_AImageReader_ImageCallback(void* context, AImageReader* reader);
-
-	long mFrameIndex = 0;  // initial frame number is 0 !!!
-	AImageReader *mReader = nullptr;
-
-	std::mutex caller_mutex_;
-	std::condition_variable caller_cv_;
-	int cb_is_ongoing = 0;
-	int destroyed = 0;
-	void notify_cb_ongoing(int ongoing_);
-
-	TestReader(int width, int height, int format = 0x01, int maxImages = 3, uint64_t usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN);
-	virtual ~TestReader();
-	ANativeWindow *getANativeWindow();
-
-	// this waill wakeup waitData !
-	void incFrameNumber();
-	virtual void onImageAvailableCallback(AImageReader *reader);
-
-	// wait until mFrameIndex >= frameIndex !
-	virtual int waitFrame(long frameIndex, long timeout_ms);
-};
 
 class FootballPPTester {
 public:
+
+	DECLARE_SessionInfo_on_frame(on_frame_);
+
 	enum {
 		SOURCE_FILE = 0,
 		SOURCE_DISPLAY = 1,
 	};
-	FootballPPTester(FootballBlController *bl_controller, int source_type_ = SOURCE_FILE);
+	enum {
+		SINK_SURFACE = 0,
+		SINK_IMAGE_READER = 1,
+	};
+	FootballPPTester(FootballBlController *bl_controller,
+		int pp_type_ = FootballPPFactory::PP_CPU,
+		int pp_sub_type = 0,
+		int source_type_ = SOURCE_FILE,
+		int sink_type = SINK_SURFACE
+		);
 	~FootballPPTester();
+
+	int getPPType() { return mPPType; }
+	int getSessionType() { return mPPSessionType; }
 	int getSourceType() { return source_type; }
 
 	// with file as source
@@ -60,15 +54,25 @@ public:
 	void process_current_file(int num_of_times, int have_algo);
 
 	// with display as source
+	enum {
+		VD_OP_CLOSE = 0,
+		VD_OP_OPEN = 1,
+		VD_OP_TOGGLE = 2,
+	};
 	int virtual_display_source_setup(int flags);
 
 	//
+	int setParameter(SessionParameter *parameter);
 	void print();
 
 	void test();
 
 	FootballBlController *mFootballBlController = nullptr;
+	int mPPType = FootballPPFactory::PP_VK;
+	int mPPSessionType = 0;
 	int source_type = SOURCE_FILE;
+	int mSinkType = SINK_SURFACE;
+	
 	FootballPP *mFootballPP = nullptr;
 
 	//
@@ -82,9 +86,15 @@ public:
 	int mBlDataHeight = 0;
 	
 	int mSessionId = -1;
-	FootSession mSession;
-	TestReader *mFinalImageReader = nullptr;
+		/** this info is maintained and shared in the all  lifetime of session !!! **/
+	SessionInfo mSessionInfo;
+	
 	ANativeHooSurface *mHooSurface = nullptr;
+	int first_few_frame_comming = 0;
+	std::mutex mHooSurface_mutex_;
+
+	TestReader *mFinalImageReader = nullptr;
+	
 	TestReader *mBlDataReader = nullptr;
 
 	long mFrameIndex = 0;

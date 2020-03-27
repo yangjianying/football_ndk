@@ -16,22 +16,28 @@
 #include <stdint.h>
 #include <string>
 
-#include "MemTrace.h"
-#include "StbImage_.h"
+#include "FootballConfig.h"
 
-#include "FootballPPVk.h"
-#include "FootSessionVkImpl.h"
-#include "gpu_tonemapper/utils/sync_task.h"
-#include "FootballPPTester.h"
+#include "utils/MemTrace.h"
+#include "utils/StbImage_.h"
+
+
+#include "pp/impl/FootballPPUtils.h"
+#include "pp/impl/FootballPPVk.h"
+#include "pp/FootballPPTester.h"
+
+#include "standalone/AAssetManagerImpl_.h"
 
 #include "VulkanMain_.hpp"       //
-#include "AAssetManagerImpl_.h"
 
-#include "computeshaderdemo1.h"
+#include "computedemo1_1.h"
+
+#include "FootSessionVkImpl.h"
+
+#undef __CLASS__
+#define __CLASS__ "FootSessionVkImpl"
 
 using namespace football;
-using namespace sdm;
-
 
 namespace computedemo1 {
 namespace impl {
@@ -41,9 +47,10 @@ public:
 	static Renderer_ *build(FootSessionVkImpl *vkImpl, struct android_app_ *app);
 	struct android_app_ *mApp = nullptr;
 	Renderer_(struct android_app_ *app):mApp(app) {}
+	virtual void set_parameter(SessionParameterTriggerData *data_) = 0;
+	virtual void processFrame(AHardwareBuffer *buffer) = 0;
 	virtual ~Renderer_() {
 	}
-	virtual void processFrame(AHardwareBuffer *buffer) = 0;
 };
 
 class Renderer_Impl1: public Renderer_ {
@@ -53,24 +60,35 @@ public:
 	FootSessionVkImpl *mFootSessionVkImpl = nullptr;
 	Renderer_Impl1(FootSessionVkImpl *vkImpl, struct android_app_ *app):
 		Renderer_(app), mFootSessionVkImpl(vkImpl) {
-		::android_facade::AAssetManagerImpl_setAssetRootPath("/sdcard/data/tutorial06_texture/assets/");
+		::android_facade::AAssetManagerImpl_setAssetRootPath("tutorial06_texture/assets/");
 		InitVulkan(mApp);
 	}
-	virtual ~Renderer_Impl1() {
-		DeleteVulkan();
+	virtual void set_parameter(SessionParameterTriggerData *data_) {
+
 	}
 	virtual void processFrame(AHardwareBuffer *buffer){
 		if (IsVulkanReady()) {
+		#if 0
+			VulkanDrawFrame();
+		#else
 			if (importAHardwareBufferAsTexture(buffer) == 0) {
 				VulkanDrawFrame();
-				DeleteImportTexture();	// release hardwareBuffer imported !!!
+
+				//DeleteImportTexture(0x01);	// release hardwareBuffer imported !!!
+				DeleteImportTexture();	
+
+				mFootSessionVkImpl->mSessionInfo._on_frame_call();
 			}
-		}
+		#endif
+		}
 
 		{
-			ANativeWindow * inputWindow = mFootSessionVkImpl->mFootSession.backlight_data;
+			ANativeWindow * inputWindow = mFootSessionVkImpl->mSessionInfo.backlight_data;
 			fill_ANativeWindow_with_color(inputWindow, 0x000000ff);
 		}
+	}
+	virtual ~Renderer_Impl1() {
+		DeleteVulkan();
 	}
 };
 class Renderer_Impl2: public Renderer_ {
@@ -79,19 +97,44 @@ class Renderer_Impl2: public Renderer_ {
 */
 public:
 	FootSessionVkImpl *mFootSessionVkImpl = nullptr;
-	
-	computeshaderdemo1::VulkanExample *mVulkanExample = nullptr;
 
+
+	//#define VulkanExample_CLASS computedemo1_1::VulkanExample
+	//#define ASSET_PATH "SaschaWillems/computeshader_foot/assets/"
+
+	#define VulkanExample_CLASS computedemo1_1::VulkanExample
+	#define VulkanExample_ASSET "SaschaWillems/computedemo1/assets/"
+	
+	VulkanExample_CLASS *mVulkanExample = nullptr;
 	Renderer_Impl2(FootSessionVkImpl *vkImpl, struct android_app_ *app):
 		Renderer_(app), mFootSessionVkImpl(vkImpl) {
 		
-		::android_facade::AAssetManagerImpl_setAssetRootPath("/sdcard/data/SaschaWillems/computeshader_foot/assets/");
+		::android_facade::AAssetManagerImpl_setAssetRootPath(VulkanExample_ASSET);
 		vks::android::getDeviceConfig();
 		
 		androidApp = app;
 
-		mVulkanExample = new computeshaderdemo1::VulkanExample();
+		mVulkanExample = new VulkanExample_CLASS();
+		if(mFootSessionVkImpl->mType_ == 20) { // test histogram with graphic pipeline 
+			mVulkanExample->setExtraInitFlag(VulkanExample_CLASS::INIT_HISTOGRAM_GRAPHIC);
+		}
+		else if(mFootSessionVkImpl->mType_ == 11) { // histogram with compute pipeline, AGC
+			mVulkanExample->setExtraInitFlag(VulkanExample_CLASS::INIT_COMPUTE_AGC);
+		}
+		else if(mFootSessionVkImpl->mType_ == 12) { // histogram with compute pipeline, BHE
+			mVulkanExample->setExtraInitFlag(VulkanExample_CLASS::INIT_COMPUTE_BHE);
+		}
+		else if(mFootSessionVkImpl->mType_ == 13) { // histogram with compute pipeline, AGC+BHE
+			mVulkanExample->setExtraInitFlag(VulkanExample_CLASS::INIT_COMPUTE_AGC_BHE);
+		}
+		else if(mFootSessionVkImpl->mType_ == 14) {
+			mVulkanExample->setExtraInitFlag(VulkanExample_CLASS::INIT_COMPUTE_MasiaEO);
+		}
+		else {
+		}
+		mVulkanExample->InitExtra();
 
+		
 		bool init_result = mVulkanExample->initVulkan();
 		assert(init_result == true);
 		mVulkanExample->prepare();
@@ -99,26 +142,56 @@ public:
 
 		mVulkanExample->renderFrame__android_prepare();
 	}
+	virtual void set_parameter(SessionParameterTriggerData *data_) {
+		if (data_->type == 1) {
+			if (data_->param_int0) {
+				mVulkanExample->setDebugWindow(1);
+			}
+			else {
+				mVulkanExample->setDebugWindow(0);
+			}
+		}
+		else if(data_->type == 2) {
+			mVulkanExample->impl1_setBHE_factor(data_->factor0, data_->factor1);
+		}
+		else if(data_->type == 3) {
+			mVulkanExample->setScreenMode(data_->param_int0);
+		}
+		else if(data_->type == 4) {
+			mVulkanExample->impl1_setBHE_tuning(data_->factor0, data_->factor1);
+		}
+
+	}
+	virtual void processFrame(AHardwareBuffer *buffer){
+
+		if (mVulkanExample->importAHardwareBufferAsTexture(buffer) == 0) {
+			mVulkanExample->renderFrame__android();
+			mVulkanExample->deleteImportTexture();
+		}
+		mFootSessionVkImpl->mSessionInfo._on_frame_call();
+	
+		{
+			ANativeWindow * inputWindow = mFootSessionVkImpl->mSessionInfo.backlight_data;
+			fill_ANativeWindow_with_color(inputWindow, 0x000000ff);
+		}
+	}
 	virtual ~Renderer_Impl2() {
 		if (mVulkanExample->prepared) {
 			mVulkanExample->swapChain.cleanup();
 		}
 		delete(mVulkanExample);
 	}
-	virtual void processFrame(AHardwareBuffer *buffer){
-
-		mVulkanExample->renderFrame__android();
-
-		{
-			ANativeWindow * inputWindow = mFootSessionVkImpl->mFootSession.backlight_data;
-			fill_ANativeWindow_with_color(inputWindow, 0x000000ff);
-		}
-	}
 };
 
 /*static*/ Renderer_ *Renderer_::build(FootSessionVkImpl *vkImpl, struct android_app_ *app) {
-	//return new Renderer_Impl1(vkImpl, app);
-	return new Renderer_Impl2(vkImpl, app);
+	DLOGD( "Renderer_::%s, vkImpl->mType_ = %d \r\n", __func__, vkImpl->mType_);
+	if (vkImpl->mType_ == 0) {
+		return new Renderer_Impl1(vkImpl, app);
+	}
+	else {
+		return new Renderer_Impl2(vkImpl, app);
+	}
+	return new Renderer_Impl1(vkImpl, app);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,205 +210,70 @@ public:
 	ANativeActivity mNativeActivity;
 	struct android_app_ mApp;
 };
-enum class VkRenderTaskCode : int32_t {
-  kCodeGetInstance,
-  kCodeBlit,
-  kCodeDestroy,
-};
-struct VkRenderTaskGetInstanceContext : public SyncTask<VkRenderTaskCode>::TaskContext {
-	ANativeWindow *window = nullptr;
-};
-struct VkRenderTaskBlitContext : public SyncTask<VkRenderTaskCode>::TaskContext {
-	AHardwareBuffer *hardware_buffer = nullptr;
-};
-class RenderingHandler : public SyncTask<VkRenderTaskCode>::TaskHandler {
+
+class RenderingHandler: public SyncTaskHandler {
 public:
-	RenderingHandler(FootSessionVkImpl *vkImpl):mFootSessionVkImpl(vkImpl),
-		tone_map_task_(new SyncTask<VkRenderTaskCode>(*this)) {
-		start(mFootSessionVkImpl->mFootSession.final_image);
+	
+	RenderingHandler(FootSessionVkImpl *impl): mSessionImpl(impl)
+	{
+		SyncTaskHandler::init(impl->mSessionInfo.final_image);
 	}
-	~RenderingHandler() {
-		fprintf(stderr, "RenderingHandler::%s ... \r\n", __func__);
-		{
-			std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-			mDestroied = true;
-		}
-		stop();
-		if (tone_map_task_ != nullptr) {
-			delete tone_map_task_;
-			tone_map_task_ = nullptr;
-		}
-		fprintf(stderr, "RenderingHandler::%s done \r\n", __func__);
-	}
-	void processFrame(AHardwareBuffer *buffer) {
-	 	std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-		if (mDestroied) {
-			fprintf(stderr, "RenderingHandler::%s mDestroied !!! skip this frame .\r\n", __func__);
-			return ;
-		}
-		fprintf(stderr, "RenderingHandler::%s ... \r\n", __func__);
-		if (tone_map_task_ != nullptr) {
-			VkRenderTaskBlitContext ctx = {};
-			ctx.hardware_buffer = buffer;
-			tone_map_task_->PerformTask(VkRenderTaskCode::kCodeBlit, &ctx);
-		}
-		fprintf(stderr, "RenderingHandler::%s done \r\n", __func__);
-	}
-	void start(ANativeWindow *window) {
-		std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-		fprintf(stderr, "RenderingHandler::%s ...\r\n", __func__);
-		if (tone_map_task_ != nullptr) {
-			VkRenderTaskGetInstanceContext ctx;
-			ctx.window = window;
-			tone_map_task_->PerformTask(VkRenderTaskCode::kCodeGetInstance, &ctx);
-		}
-		fprintf(stderr, "RenderingHandler::%s done \r\n", __func__);
-	}
-	void stop() {
-		std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-		fprintf(stderr, "RenderingHandler::%s ...\r\n", __func__);
-		if (tone_map_task_ != nullptr) {
-			tone_map_task_->PerformTask(VkRenderTaskCode::kCodeDestroy, nullptr);
-		}
-		fprintf(stderr, "RenderingHandler::%s done \r\n", __func__);
+	~RenderingHandler() { 
+		SyncTaskHandler::deinit();
 	}
 
-	//
-	void setup_l(ANativeWindow *window) {
-		fprintf(stderr, "RenderingHandler::%s ...\r\n", __func__);
+	void processFrame(AHardwareBuffer *buffer) {
+		process(buffer);
+	}
+
+	virtual int onStart(void *ctx_) override {
+		ANativeWindow *window = static_cast<ANativeWindow *>(ctx_);
+		DLOGD( "RenderingHandler::%s ...\r\n", __func__);
 		
 		mAndroid_app.setWindow(window);
-		mRenderer_ = Renderer_::build(mFootSessionVkImpl, mAndroid_app.getApp());
+		mRenderer_ = Renderer_::build(mSessionImpl, mAndroid_app.getApp());
 
-		fprintf(stderr, "RenderingHandler::%s done \r\n", __func__);
+		DLOGD( "RenderingHandler::%s done \r\n", __func__);
+		return 0;
 	}
-	void release_l() {
-		fprintf(stderr, "RenderingHandler::%s ...\r\n", __func__);
+	virtual int onParameter(int type_, void *parameter_) override {
+		if (type_ == 0) {
+			SessionParameterTriggerData *data_ = (SessionParameterTriggerData*) parameter_;
+			mRenderer_->set_parameter(data_);
+		}
+		return 0;
+	}
+	virtual int onProcess(void *something) override {
+		AHardwareBuffer *buffer = static_cast<AHardwareBuffer *>(something);
+		DLOGD( "RenderingHandler::%s ...\r\n", __func__);
+		mRenderer_->processFrame(buffer);
+		DLOGD( "RenderingHandler::%s done \r\n", __func__);
+		return 0;
+	}
+	virtual int onStop() override {
+		DLOGD( "RenderingHandler::%s ...\r\n", __func__);
 		delete mRenderer_;
 		mRenderer_ = nullptr;
-		fprintf(stderr, "RenderingHandler::%s done \r\n", __func__);
-	}
-	void processFrame_l(AHardwareBuffer *buffer) {
-		fprintf(stderr, "RenderingHandler::%s ...\r\n", __func__);
-		mRenderer_->processFrame(buffer);
-		fprintf(stderr, "RenderingHandler::%s done \r\n", __func__);
+		DLOGD( "RenderingHandler::%s done \r\n", __func__);
+		return 0;
 	}
 
-	// TaskHandler methods implementation.
-	virtual void OnTask(const VkRenderTaskCode &task_code,
-						SyncTask<VkRenderTaskCode>::TaskContext *task_context) {
-		fprintf(stderr, "RenderingHandler::%s, task_code:%d \r\n", __func__, (int)task_code);
-	  switch (task_code) {
-		case VkRenderTaskCode::kCodeGetInstance: {
-			VkRenderTaskGetInstanceContext *ctx = static_cast<VkRenderTaskGetInstanceContext *>(task_context);
-			// init gl
-			if (mSetupFlag == false) {
-				setup_l(ctx->window);
-				mSetupFlag = true;
-			}
-		  }
-		  break;
-
-		case VkRenderTaskCode::kCodeBlit: {
-			VkRenderTaskBlitContext *ctx = static_cast<VkRenderTaskBlitContext *>(task_context);
-			// consume hardware_buffer
-			if (mSetupFlag) {
-				processFrame_l(ctx->hardware_buffer);
-			}
-		  }
-		  break;
-
-		case VkRenderTaskCode::kCodeDestroy: {
-			// destroy gl
-			if (mSetupFlag) {
-				mSetupFlag = false;
-				release_l();
-			}
-		  }
-		  break;
-		default:
-		  break;
-	  }
-
-	}
-
-	FootSessionVkImpl *mFootSessionVkImpl = nullptr;
-	SyncTask<VkRenderTaskCode> *tone_map_task_ = nullptr;
-	bool mSetupFlag = false;
-	bool mDestroied = false;
-	std::mutex caller_mutex_;
-
+	FootSessionVkImpl *mSessionImpl = nullptr;
 	AndroidApp_ mAndroid_app;
-
 	Renderer_ *mRenderer_ = nullptr;
 
 };
 
-class HardwareBufferReader: public TestReader {
-public:
-	FootSessionVkImpl *mImpl = nullptr;
-	HardwareBufferReader(FootSessionVkImpl *impl, int width, int height, int format, int maxImages = 3)
-		:TestReader(width, height, format, maxImages,
-				AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER
-				//| AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN
-				| AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE
-				//| AHARDWAREBUFFER_USAGE_CPU_WRITE_NEVER
-				), 
-		mImpl(impl) 
-	{
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
-	}
-	virtual ~HardwareBufferReader() {
-		fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
-	}
-	virtual void onImageAvailableCallback(AImageReader *reader) {
-		std::unique_lock<std::mutex> caller_lock(caller_mutex_);
-		if (destroyed) {
-			fprintf(stderr, "%s,%d destroyed skip 1 !!! \r\n", __func__, __LINE__);
-			return ;
-		}
 
-		cb_is_ongoing = 1; //notify_cb_ongoing(1);
-		caller_cv_.notify_one();
+FootSessionVkImpl::FootSessionVkImpl(int type_, SessionInfo &session) :
+	ImageReaderImageListenerWrapper(),
+	mType_(type_),
+	mSessionInfo(session) {
+	DLOGD( "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
 
-		fprintf(stderr, "HardwareBufferReader::%s,%d frame: %ld tid:%lu \r\n", __func__, __LINE__, mFrameIndex, pthread_self());
-
-		if (destroyed) {
-			fprintf(stderr, "%s,%d destroyed skip 2 !!! \r\n", __func__, __LINE__);
-			return ;
-		}
-
-		AImage *image_ = nullptr;
-		media_status_t ret = AImageReader_acquireLatestImage(reader, &image_);
-		if (ret == AMEDIA_OK && image_ != nullptr) {
-			// here read using CPU will failed !!!
-			if (mImpl != nullptr && mImpl->mRenderingHandler != nullptr) {
-				AHardwareBuffer *hardware_buffer_ = nullptr;
-				ret = AImage_getHardwareBuffer(image_, &hardware_buffer_);
-				if (ret == AMEDIA_OK && hardware_buffer_ != nullptr) {
-					mImpl->processFrame(hardware_buffer_);
-				}
-				else {
-					fprintf(stderr, "AImage_getHardwareBuffer failed ! \r\n");
-				}
-			}
-			AImage_delete(image_);
-		}
-		incFrameNumber();
-		cb_is_ongoing = 0; //notify_cb_ongoing(0);
-		caller_cv_.notify_one();
-	}
-
-};
-
-
-FootSessionVkImpl::FootSessionVkImpl(FootSession *session) : ImageReaderImageListenerWrapper(),
-	mFootSession(*session) {
-	fprintf(stderr, "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
-
-	if (session->final_image == nullptr
-		|| session->backlight_data == nullptr) {
-		fprintf(stderr, "%s,%d error\r\n", __func__, __LINE__);
+	if (mSessionInfo.final_image == nullptr
+		|| mSessionInfo.backlight_data == nullptr) {
+		DLOGD( "%s,%d error\r\n", __func__, __LINE__);
 		return ;
 	}
 	int32_t width_ = 0;
@@ -343,31 +281,31 @@ FootSessionVkImpl::FootSessionVkImpl(FootSession *session) : ImageReaderImageLis
 	int32_t format_ = 0;
 	int32_t maxImages_ = 0;
 
-	width_ = ANativeWindow_getWidth(session->final_image);
-	height_ = ANativeWindow_getHeight(session->final_image);
-	format_ = ANativeWindow_getFormat(session->final_image);
-	if (session->width != width_) {
-		mFootSession.width = width_;
+	width_ = ANativeWindow_getWidth(mSessionInfo.final_image);
+	height_ = ANativeWindow_getHeight(mSessionInfo.final_image);
+	format_ = ANativeWindow_getFormat(mSessionInfo.final_image);
+	if (mSessionInfo.width != width_) {
+		mSessionInfo.width = width_;
 	}
-	if (session->height != height_) {
-		mFootSession.height = height_;
+	if (mSessionInfo.height != height_) {
+		mSessionInfo.height = height_;
 	}
-	if (session->format != format_) {
-		mFootSession.format = format_;
-		mFootSession.format = AIMAGE_FORMAT_RGBA_8888;
+	if (mSessionInfo.format != format_) {
+		mSessionInfo.format = format_;
+		mSessionInfo.format = AIMAGE_FORMAT_RGBA_8888;
 	}
 
-	width_ = ANativeWindow_getWidth(session->backlight_data);
-	height_ = ANativeWindow_getHeight(session->backlight_data);
-	format_ = ANativeWindow_getFormat(session->backlight_data);
-	if (session->bl_width != width_) {
-		mFootSession.bl_width = width_; 
+	width_ = ANativeWindow_getWidth(mSessionInfo.backlight_data);
+	height_ = ANativeWindow_getHeight(mSessionInfo.backlight_data);
+	format_ = ANativeWindow_getFormat(mSessionInfo.backlight_data);
+	if (mSessionInfo.bl_width != width_) {
+		mSessionInfo.bl_width = width_; 
 	}
-	if (session->bl_height != height_) {
-		mFootSession.bl_height = height_; 
+	if (mSessionInfo.bl_height != height_) {
+		mSessionInfo.bl_height = height_; 
 	}
-	if (session->bl_format != format_) {
-		mFootSession.bl_format = format_; 
+	if (mSessionInfo.bl_format != format_) {
+		mSessionInfo.bl_format = format_; 
 	}
 
 	// create rendering thread 
@@ -378,9 +316,21 @@ FootSessionVkImpl::FootSessionVkImpl(FootSession *session) : ImageReaderImageLis
 
 #if 1
 {
-	mHardwareBufferReader = new HardwareBufferReader(this, mFootSession.width, mFootSession.height, mFootSession.format);
-	mFootSession.input_window = mHardwareBufferReader->getANativeWindow();
-	session->input_window = mFootSession.input_window;
+	uint64_t usage_ = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER
+						| AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+	if (mSessionInfo.inputOwner > 0) {
+		if (mSessionInfo.inputOwner == SessionInfo::INPUT_OWNER_VIRTUAL_DISPLAY) {
+		}
+		else if (mSessionInfo.inputOwner == SessionInfo::INPUT_OWNER_CPU) {
+			usage_ = AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN
+				| AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
+		}
+	}
+	mHardwareBufferReader = new football::HardwareBufferReader(this, mSessionInfo.width, mSessionInfo.height, mSessionInfo.format, 3,
+					usage_, football::HardwareBufferReader::PROC_HARDWARE_BUFFER);
+
+	mSessionInfo.input_window = mHardwareBufferReader->getANativeWindow();
+	mSessionInfo.input_window = mSessionInfo.input_window;
 }
 #else
 {
@@ -389,9 +339,8 @@ FootSessionVkImpl::FootSessionVkImpl(FootSession *session) : ImageReaderImageLis
 	usage_ |= AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER;  // for gpu framebuffer
 	usage_ |= AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
 	AImageReader *reader_ = nullptr;
-	//media_status_t ret = AImageReader_new(mFootSession.width, mFootSession.height, mFootSession.format, 3, &reader_);
 	media_status_t ret = AImageReader_newWithUsage(
-							mFootSession.width, mFootSession.height, mFootSession.format, usage_, 3, &reader_);
+							mSessionInfo.width, mSessionInfo.height, mSessionInfo.format, usage_, 3, &reader_);
 	if (ret == AMEDIA_OK && reader_ != nullptr) {
 		mReader = reader_;
 		AImageReader_setImageListener(mReader, this);
@@ -404,21 +353,21 @@ FootSessionVkImpl::FootSessionVkImpl(FootSession *session) : ImageReaderImageLis
 		ANativeWindow *window_ = nullptr;
 		ret = AImageReader_getWindow(reader_, &window_);
 		if (ret == AMEDIA_OK && window_ != nullptr) {
-			mFootSession.input_window = window_;
-			session->input_window = mFootSession.input_window;
+			mSessionInfo.input_window = window_;
+			session->input_window = mSessionInfo.input_window;
 		}
 	}
 }
 #endif
-	fprintf(stderr, "# session window size: %04d x %04d format:%08x / bl data size:%04d x %04d format:%08x \r\n", 
-		mFootSession.width, mFootSession.height, mFootSession.format,
-		mFootSession.bl_width, mFootSession.bl_height, mFootSession.bl_format);
+	DLOGD( "# session window size: %04d x %04d format:%08x / bl data size:%04d x %04d format:%08x \r\n", 
+		mSessionInfo.width, mSessionInfo.height, mSessionInfo.format,
+		mSessionInfo.bl_width, mSessionInfo.bl_height, mSessionInfo.bl_format);
 
 
 }
 
 FootSessionVkImpl::~FootSessionVkImpl() {
-	fprintf(stderr, "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
+	DLOGD( "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
 
 	{
 		if (mHardwareBufferReader != nullptr) {
@@ -443,12 +392,23 @@ FootSessionVkImpl::~FootSessionVkImpl() {
 		AImageReader_delete(mReader);
 	}
 
-	fprintf(stderr, "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
+	DLOGD( "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
 }
 bool FootSessionVkImpl::isValid() {
-	return mFootSession.input_window != nullptr ? true : false;
+	return mSessionInfo.input_window != nullptr ? true : false;
 }
 int FootSessionVkImpl::setSessionParameter(SessionParameter *parameter) {
+	if (parameter->trigger_request) {
+		parameter->trigger_request = 0;  // only trigger once !!!
+
+		// for handler
+		if (parameter->request_type == 1) {
+			std::unique_lock<std::mutex> caller_lock(mRenderingHandler_lock);
+			if (mRenderingHandler != nullptr) {
+				mRenderingHandler->post_parameter(0, (void *)(&(parameter->trigger_data)));
+			}
+		}
+	}
 	mSessionParameter = *parameter;
 	return 0;
 }
@@ -458,41 +418,26 @@ int FootSessionVkImpl::getSessionParameter(SessionParameter *parameter) {
 }
 
 void FootSessionVkImpl::print() {
-	fprintf(stderr, "%s \r\n", __func__);
+	DLOGD( "%s \r\n", __func__);
 }
 
-void FootSessionVkImpl::processFrame(AHardwareBuffer *buffer) {
+// impl public football::HardwareBufferReader::CB
+int FootSessionVkImpl::on_process_frame(AHardwareBuffer *buffer) {
 	std::unique_lock<std::mutex> caller_lock(mRenderingHandler_lock);
 	if (mRenderingHandler != nullptr) {
 		mRenderingHandler->processFrame(buffer);
 	}
+	return 0;
 }
 
+// iml public football::ImageReaderImageListenerWrapper 
 void FootSessionVkImpl::onImageAvailableCallback(AImageReader *reader) {
-	fprintf(stderr, "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
-	if (reader != mReader) { fprintf(stderr, "*** impossible to reach here:%s,%d \r\n", __func__, __LINE__); return ;}
+	DLOGD( "FootSessionVkImpl::%s,%d  tid:%lu \r\n", __func__, __LINE__, pthread_self());
+	if (reader != mReader) { DLOGD( "*** impossible to reach here:%s,%d \r\n", __func__, __LINE__); return ;}
 
 	AImage *image_ = nullptr;
 	media_status_t ret = AImageReader_acquireLatestImage(reader, &image_);
 	if (ret == AMEDIA_OK && image_ != nullptr) {
-#if 1
-		// post to rendering thread
-		if (mRenderingHandler != nullptr) {
-			media_status_t ret;
-			AHardwareBuffer *hardware_buffer_ = nullptr;
-			ret = AImage_getHardwareBuffer(image_, &hardware_buffer_);
-			if (ret == AMEDIA_OK && hardware_buffer_ != nullptr) {
-				{
-					std::unique_lock<std::mutex> caller_lock(mRenderingHandler_lock);
-					if (mRenderingHandler != nullptr) {
-						mRenderingHandler->processFrame(hardware_buffer_);
-					}
-				}
-			}
-		}
-#else
-		fprintf(stderr, "    * drop! tid:%lu \r\n", pthread_self());
-#endif
 		AImage_delete(image_);
 	}
 }

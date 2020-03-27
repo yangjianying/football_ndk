@@ -6,6 +6,7 @@
 #include <string>
 #include <map>
 
+
 #include <android/native_window.h>  // ANativeWindow, ANativeWindow_Buffer
 #include <android/surface_control.h>
 #include <android/hardware_buffer.h>
@@ -13,50 +14,56 @@
 
 #include <media/NdkImage.h>
 #include <media/NdkImageReader.h>
-#if 0
-#include <media/NdkMediaCodec.h>
-#include <media/NdkMediaCrypto.h>
-#include <media/NdkMediaDataSource.h>
-#include <media/NdkMediaDrm.h>
-#include <media/NdkMediaError.h>
-#include <media/NdkMediaExtractor.h>
-#include <media/NdkMediaFormat.h>
-#include <media/NdkMediaMuxer.h>
-#endif
 
 #include "FootballPP.h"
+
 #include "ANativeWindowUtils.h"
 
 namespace football {
 
+
 class TestColorGenerator;
+
 
 class FootballPPCpu: public FootballPP {
 public:
 
-	class FootSessionCpu: public AImageReader_ImageListener {
+	class FootSessionCpu: 
+		public ::football::FootballPP::FootballSession
+		, public football::ImageReaderImageListenerWrapper
+		, public HardwareBufferReader::CB
+			{
 	public:
-		static void s_AImageReader_ImageCallback(void* context, AImageReader* reader);
-
-		FootSessionCpu(FootSession *session);
-		~FootSessionCpu();
+		FootSessionCpu(SessionInfo &session);
+		virtual ~FootSessionCpu();
 		bool isValid();
 
 		int max_mean_value(AImageData *image_data, int x, int y, int w_, int h_, long *max_, long *mean_);
 		int led_spread();
-		void processImage(AImageData *image_data);
+		void processImage1(AImageData *image_data);
 		void onImageProc1(AImageData *image_data);
-		void onImageAvailableCallback(AImageReader *reader);
 
-		int setSessionParameter(SessionParameter *parameter);
-		int getSessionParameter(SessionParameter *parameter);
-		void print();
+		void processingImage(AImage *image_ );
 
-		FootSession mFootSession;
+		// impl public football::ImageReaderImageListenerWrapper
+		virtual void onImageAvailableCallback(AImageReader *reader) override ;
+
+		// impl public HardwareBufferReader::CB
+		virtual int on_process_image(AImage *image_) override;
+
+		// impl public ::football::FootballPP::FootballSession
+		virtual int setSessionParameter(SessionParameter *parameter) override ;
+		virtual int getSessionParameter(SessionParameter *parameter) override ;
+		virtual void print() override ;
+
+		//
+		SessionInfo &mSessionInfo;
 		SessionParameter mSessionParameter;
 
 		int mId = -1;
+		
 		AImageReader *mReader = nullptr;
+		HardwareBufferReader *mHardwareBufferReader = nullptr;
 		TestColorGenerator *mTestColorGenerator = nullptr;
 
 		AImageData *mLastIncommingData = nullptr;
@@ -107,18 +114,8 @@ public:
 
 	FootballPPCpu();
 	virtual ~FootballPPCpu() override;
-	virtual int buildSession(FootSession *session, int *session_id) override;
-	virtual int closeSession(int session_id) override;
-	virtual int setSessionParameter(int session_id, SessionParameter *parameter) override;
-	virtual int getSessionParameter(int session_id, SessionParameter *parameter) override;
-	virtual std::vector<int> getSessionIds() override;
-	virtual int getSession(int session_id, FootSession *session) override;
-	virtual void print(int session_id) override;
-
-	std::vector<int> mSessionIds;
-	std::map<int, FootSessionCpu*> mSessions;
-
-	static int s_SessionId_generator;
+	virtual int buildSession(int session_type, SessionInfo &session, int *session_id) override;
+	
 };
 
 

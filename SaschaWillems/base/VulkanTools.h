@@ -101,6 +101,10 @@ namespace vks
 			VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 			VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
+		void setImageLayout_(VkCommandBuffer cmdBuffer, VkImage image,
+							VkImageLayout oldImageLayout, VkImageLayout newImageLayout,
+							VkPipelineStageFlags srcStages, VkPipelineStageFlags destStages);
+
 		/** @brief Inser an image memory barrier into the command buffer */
 		void insertImageMemoryBarrier(
 			VkCommandBuffer cmdbuffer,
@@ -120,6 +124,7 @@ namespace vks
 		// Load a SPIR-V shader (binary) 
 #if defined(__ANDROID__)
 		VkShaderModule loadShader(AAssetManager* assetManager, const char *fileName, VkDevice device);
+		VkShaderModule loadShader_from_string(const std::string &source_, VkShaderStageFlagBits type, VkDevice device);
 #else
 		VkShaderModule loadShader(const char *fileName, VkDevice device);
 #endif

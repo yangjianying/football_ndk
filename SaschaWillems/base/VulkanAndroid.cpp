@@ -12,7 +12,14 @@
 	#include <android/log.h>
 	#include <dlfcn.h>
 	#include <android/native_window_jni.h>
+
 	#include "native_app_glue.h"  // frankie, add
+
+#include "utils/football_debugger.h"
+
+#undef __CLASS__
+#define __CLASS__ "VulkanAndroid"
+
 
 android_app_* androidApp;
 
@@ -40,11 +47,14 @@ PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges;
 PFN_vkInvalidateMappedMemoryRanges vkInvalidateMappedMemoryRanges;
 PFN_vkBindBufferMemory vkBindBufferMemory;
 PFN_vkDestroyBuffer vkDestroyBuffer;
+PFN_vkCreateBufferView vkCreateBufferView;  // frankie, add
+PFN_vkDestroyBufferView vkDestroyBufferView;  // frankie, add
 PFN_vkAllocateMemory vkAllocateMemory;
 PFN_vkBindImageMemory vkBindImageMemory;
 PFN_vkGetImageSubresourceLayout vkGetImageSubresourceLayout;
 PFN_vkCmdCopyBuffer vkCmdCopyBuffer;
 PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
+PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;  // frankie, add
 PFN_vkCmdCopyImage vkCmdCopyImage;
 PFN_vkCmdBlitImage vkCmdBlitImage;
 PFN_vkCmdClearAttachments vkCmdClearAttachments;
@@ -118,8 +128,25 @@ PFN_vkCmdEndQuery vkCmdEndQuery;
 PFN_vkCmdResetQueryPool vkCmdResetQueryPool;
 PFN_vkCmdCopyQueryPoolResults vkCmdCopyQueryPoolResults;
 
-PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR;
 PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR;
+PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
+PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
+PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormatsKHR;
+PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR;
+
+// VK_KHR_swapchain
+PFN_vkCreateSwapchainKHR vkCreateSwapchainKHR;
+PFN_vkDestroySwapchainKHR vkDestroySwapchainKHR;
+PFN_vkGetSwapchainImagesKHR vkGetSwapchainImagesKHR;
+PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
+PFN_vkQueuePresentKHR vkQueuePresentKHR;
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+// VK_KHR_android_surface
+PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR;
+PFN_vkGetAndroidHardwareBufferPropertiesANDROID vkGetAndroidHardwareBufferPropertiesANDROID;
+PFN_vkGetMemoryAndroidHardwareBufferANDROID vkGetMemoryAndroidHardwareBufferANDROID;
+#endif
 
 int32_t vks::android::screenDensity;
 
@@ -178,6 +205,8 @@ namespace vks
 			vkInvalidateMappedMemoryRanges = reinterpret_cast<PFN_vkInvalidateMappedMemoryRanges>(vkGetInstanceProcAddr(instance, "vkInvalidateMappedMemoryRanges"));
 			vkBindBufferMemory = reinterpret_cast<PFN_vkBindBufferMemory>(vkGetInstanceProcAddr(instance, "vkBindBufferMemory"));
 			vkDestroyBuffer = reinterpret_cast<PFN_vkDestroyBuffer>(vkGetInstanceProcAddr(instance, "vkDestroyBuffer"));
+			vkCreateBufferView = reinterpret_cast<PFN_vkCreateBufferView>(vkGetInstanceProcAddr(instance, "vkCreateBufferView")); // frankie, add
+			vkDestroyBufferView = reinterpret_cast<PFN_vkDestroyBufferView>(vkGetInstanceProcAddr(instance, "vkDestroyBufferView")); // frankie, add
 
 			vkAllocateMemory = reinterpret_cast<PFN_vkAllocateMemory>(vkGetInstanceProcAddr(instance, "vkAllocateMemory"));
 			vkFreeMemory = reinterpret_cast<PFN_vkFreeMemory>(vkGetInstanceProcAddr(instance, "vkFreeMemory"));
@@ -201,6 +230,8 @@ namespace vks
 
 			vkCmdCopyBuffer = reinterpret_cast<PFN_vkCmdCopyBuffer>(vkGetInstanceProcAddr(instance, "vkCmdCopyBuffer"));
 			vkCmdCopyBufferToImage = reinterpret_cast<PFN_vkCmdCopyBufferToImage>(vkGetInstanceProcAddr(instance, "vkCmdCopyBufferToImage"));
+			vkCmdCopyImageToBuffer = 
+				reinterpret_cast<PFN_vkCmdCopyImageToBuffer>(vkGetInstanceProcAddr(instance, "vkCmdCopyImageToBuffer"));
 
 			vkCreateSampler = reinterpret_cast<PFN_vkCreateSampler>(vkGetInstanceProcAddr(instance, "vkCreateSampler"));
 			vkDestroySampler = reinterpret_cast<PFN_vkDestroySampler>(vkGetInstanceProcAddr(instance, "vkDestroySampler"));;
@@ -277,8 +308,27 @@ namespace vks
 			vkCmdResetQueryPool = reinterpret_cast<PFN_vkCmdResetQueryPool>(vkGetInstanceProcAddr(instance, "vkCmdResetQueryPool"));
 			vkCmdCopyQueryPoolResults = reinterpret_cast<PFN_vkCmdCopyQueryPoolResults>(vkGetInstanceProcAddr(instance, "vkCmdCopyQueryPoolResults"));
 
-			vkCreateAndroidSurfaceKHR = reinterpret_cast<PFN_vkCreateAndroidSurfaceKHR>(vkGetInstanceProcAddr(instance, "vkCreateAndroidSurfaceKHR"));
 			vkDestroySurfaceKHR = reinterpret_cast<PFN_vkDestroySurfaceKHR>(vkGetInstanceProcAddr(instance, "vkDestroySurfaceKHR"));
+			vkGetPhysicalDeviceSurfaceSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceSupportKHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceSupportKHR"));
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR"));
+			vkGetPhysicalDeviceSurfaceFormatsKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceFormatsKHR"));
+			vkGetPhysicalDeviceSurfacePresentModesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfacePresentModesKHR>(vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfacePresentModesKHR"));
+
+			// VK_KHR_swapchain
+			vkCreateSwapchainKHR = reinterpret_cast<PFN_vkCreateSwapchainKHR>(vkGetInstanceProcAddr(instance, "vkCreateSwapchainKHR"));
+			vkDestroySwapchainKHR = reinterpret_cast<PFN_vkDestroySwapchainKHR>(vkGetInstanceProcAddr(instance, "vkDestroySwapchainKHR"));
+			vkGetSwapchainImagesKHR = reinterpret_cast<PFN_vkGetSwapchainImagesKHR>(vkGetInstanceProcAddr(instance, "vkGetSwapchainImagesKHR"));
+			vkAcquireNextImageKHR = reinterpret_cast<PFN_vkAcquireNextImageKHR>(vkGetInstanceProcAddr(instance, "vkAcquireNextImageKHR"));
+			vkQueuePresentKHR = reinterpret_cast<PFN_vkQueuePresentKHR>(vkGetInstanceProcAddr(instance, "vkQueuePresentKHR"));
+
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+			vkCreateAndroidSurfaceKHR = reinterpret_cast<PFN_vkCreateAndroidSurfaceKHR>(vkGetInstanceProcAddr(instance, "vkCreateAndroidSurfaceKHR"));
+			vkGetAndroidHardwareBufferPropertiesANDROID = 
+				reinterpret_cast<PFN_vkGetAndroidHardwareBufferPropertiesANDROID>(vkGetInstanceProcAddr(instance, "vkGetAndroidHardwareBufferPropertiesANDROID"));
+			vkGetMemoryAndroidHardwareBufferANDROID = 
+				reinterpret_cast<PFN_vkGetMemoryAndroidHardwareBufferANDROID>(vkGetInstanceProcAddr(instance, "vkGetMemoryAndroidHardwareBufferANDROID"));
+#endif
+
 		}
 
 		void freeVulkanLibrary()
@@ -317,13 +367,90 @@ namespace vks
 
 			androidApp->activity->vm->DetachCurrentThread();
 			#else
-			fprintf(stderr, "************************************************** \r\n");
-			fprintf(stderr, "showAlert:%s \r\n", message);
-			fprintf(stderr, "************************************************** \r\n");
+			DLOGD( "************************************************** \r\n");
+			DLOGD( "showAlert:%s \r\n", message);
+			DLOGD( "************************************************** \r\n");
 			abort();
 			#endif
 			return;
 		}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static const char *get_VkFormatFeatureFlags_str(VkFormatFeatureFlags one_bit) {
+	if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) 
+		{ return "VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT) 
+		{ return "VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT) 
+		{ return "VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT) 
+		{ return "VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT) 
+		{ return "VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) 
+		{ return "VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) 
+		{ return "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT) 
+		{ return "VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) 
+		{ return "VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_BLIT_SRC_BIT) 
+		{ return "VK_FORMAT_FEATURE_BLIT_SRC_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_BLIT_DST_BIT) 
+		{ return "VK_FORMAT_FEATURE_BLIT_DST_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) 
+		{ return "VK_FORMAT_FEATURE_TRANSFER_SRC_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_TRANSFER_DST_BIT) 
+		{ return "VK_FORMAT_FEATURE_TRANSFER_DST_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT) 
+		{ return "VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_LINEAR_FILTER_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_SEPARATE_RECONSTRUCTION_FILTER_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_YCBCR_CONVERSION_CHROMA_RECONSTRUCTION_EXPLICIT_FORCEABLE_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_DISJOINT_BIT) 
+		{ return "VK_FORMAT_FEATURE_DISJOINT_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT) 
+		{ return "VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_CUBIC_BIT_IMG) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_CUBIC_BIT_IMG"; }
+	else if (one_bit == VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_MINMAX_BIT_EXT) 
+		{ return "VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_MINMAX_BIT_EXT"; }
+	else if (one_bit == VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT) 
+		{ return "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT"; }
+	
+	return "***NOT_DEFINED***";
+}
+void print_VkFormatFeatureFlags(VkFormatFeatureFlags flags) {
+	int i=0;
+	uint32_t shift_bit = 0x01;
+	for(i=0;i<32;i++) {
+		uint32_t this_bit = flags & (shift_bit << i);
+		if(this_bit) {
+			DLOGD( "[%2d]:%s \r\n", i, get_VkFormatFeatureFlags_str(this_bit));
+		}
+	}
+}
+
+
+
+
+
+
 	}
 }
 

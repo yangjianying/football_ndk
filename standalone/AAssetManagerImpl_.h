@@ -5,7 +5,8 @@
 #include <android/asset_manager.h>
 
 namespace android_facade {
-	std::string AAssetManagerImpl_setAssetRootPath(std::string path_);
+	std::string AAssetManagerImpl_setAssetBasePath(std::string base_path_);
+	std::string AAssetManagerImpl_setAssetRootPath(std::string path_, bool with_base_path = true);
 };
 
 struct AAssetManager_;

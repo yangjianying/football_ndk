@@ -14,8 +14,14 @@
  * limitations under the License.
  */
 
+#include "FootballConfig.h"
+
+
 #include "gles3jni.h"
 #include <EGL/egl.h>
+
+#undef __CLASS__
+#define __CLASS__ "RendererES2"
 
 static const char VERTEX_SHADER[] =
     "#version 100\n"

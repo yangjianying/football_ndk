@@ -14,6 +14,7 @@ message(STATUS EXAMPLE_SRC = ${EXAMPLE_SRC})
 add_library(computeshader_foot_static STATIC ${EXAMPLE_SRC})
 
 target_include_directories(computeshader_foot_static PRIVATE 
+	${REPO_ROOT_DIR}
 	.
 	${SRC_dir_app_standalone}
 	${BASE_DIR}

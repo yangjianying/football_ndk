@@ -12,12 +12,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "utils/football_debugger.h"
+
 //#include <common.h>
 //#include <bootretry.h>
 #include "cli.h"
 //#include <console.h>
 //#include <env.h>
 //#include <linux/ctype.h>
+
+#undef __CLASS__
+#define __CLASS__ "cli"
 
 #define DEBUG_PARSER	0	/* set to 1 to debug */
 
@@ -56,7 +61,7 @@ int cli::cli_simple_parse_line(char *line, char *argv[])
 		*line++ = '\0';		/* terminate current arg	 */
 	}
 
-	printf("** Too many args (max. %d) **\n", CONFIG_SYS_MAXARGS);
+	DLOGD("** Too many args (max. %d) **\n", CONFIG_SYS_MAXARGS);
 
 	debug_parser("%s: nargs=%d\n", __func__, nargs);
 	return nargs;
@@ -188,10 +193,9 @@ int cli::cli_simple_run_command(const char *cmd, int flag)
 	char *str = cmdbuf;
 	char *argv[CONFIG_SYS_MAXARGS + 1];	/* NULL terminated	*/
 	int argc, inquotes;
-	int repeatable = 1;
+	int repeatable = 0; // frankie, // 1;
 	int rc = 0;
 
-	//fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
 	debug_parser("[RUN_COMMAND] cmd[%p]=\"", cmd);
 	if (DEBUG_PARSER) {
 		/* use puts - string may be loooong */
@@ -201,7 +205,7 @@ int cli::cli_simple_run_command(const char *cmd, int flag)
 	clear_ctrlc();		/* forget any previous Control C */
 
 	if (!cmd || !*cmd) {
-		//fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+		//DLOGD( "%s,%d \r\n", __func__, __LINE__);
 		cli_cmd_empty();
 		return -1;	/* empty command */
 	}
@@ -258,7 +262,8 @@ int cli::cli_simple_run_command(const char *cmd, int flag)
 		}
 
 		int process_ret = cli_cmd_process_(flag, argc, argv, &repeatable, NULL);
-		if (process_ret == -10000) {
+		DLOGD( "process_ret=%d \r\n", process_ret);
+		if (process_ret <= -10000 && process_ret >= -20000) {  // frankie, [-10000, -20000] is customer return !
 			rc = process_ret;
 		} else if (process_ret)
 			rc = -1;
@@ -271,7 +276,92 @@ int cli::cli_simple_run_command(const char *cmd, int flag)
 	return rc ? rc : repeatable;
 }
 
-void cli::cli_simple_loop(void)
+int cli::cli_simple_check_command(const char *cmd, const char *matched, int flag)
+{
+	char cmdbuf[CONFIG_SYS_CBSIZE];	/* working copy of cmd		*/
+	char *token;			/* start of token in cmdbuf	*/
+	char *sep;			/* end of token (separator) in cmdbuf */
+	char finaltoken[CONFIG_SYS_CBSIZE];
+	char *str = cmdbuf;
+	char *argv[CONFIG_SYS_MAXARGS + 1];	/* NULL terminated	*/
+	int argc, inquotes;
+	int rc = 0;
+
+	debug_parser("[RUN_COMMAND] cmd[%p]=\"", cmd);
+	if (DEBUG_PARSER) {
+		/* use puts - string may be loooong */
+		puts(cmd ? cmd : "NULL");
+		puts("\"\n");
+	}
+	clear_ctrlc();		/* forget any previous Control C */
+
+	if (!cmd || !*cmd) {
+		//DLOGD( "%s,%d \r\n", __func__, __LINE__);
+		cli_cmd_empty();
+		return -1;	/* empty command */
+	}
+
+	if (strlen(cmd) >= CONFIG_SYS_CBSIZE) {
+		puts("## Command too long!\n");
+		return -1;
+	}
+
+	strcpy(cmdbuf, cmd);
+
+	/* Process separators and check for invalid
+	 * repeatable commands
+	 */
+
+	debug_parser("[PROCESS_SEPARATORS] %s\n", cmd);
+	while (*str) {
+		/*
+		 * Find separator, or string end
+		 * Allow simple escape of ';' by writing "\;"
+		 */
+		for (inquotes = 0, sep = str; *sep; sep++) {
+			if ((*sep == '\'') &&
+			    (*(sep - 1) != '\\'))
+				inquotes = !inquotes;
+
+			if (!inquotes &&
+			    (*sep == ';') &&	/* separator		*/
+			    (sep != str) &&	/* past string start	*/
+			    (*(sep - 1) != '\\'))	/* and NOT escaped */
+				break;
+		}
+
+		/*
+		 * Limit the token to data between separators
+		 */
+		token = str;
+		if (*sep) {
+			str = sep + 1;	/* start of command for next pass */
+			*sep = '\0';
+		} else {
+			str = sep;	/* no more commands for next pass */
+		}
+		debug_parser("token: \"%s\"\n", token);
+#if 1
+		/* find macros in this token and replace them */
+		cli_simple_process_macros(token, finaltoken);
+#endif
+		/* Extract arguments */
+		argc = cli_simple_parse_line(finaltoken, argv);
+		if (argc == 0) {
+			rc = 0;	/* no command at all */
+			continue;
+		}
+
+		if(argc > 0 && strcmp(argv[0], matched) == 0) {
+			rc = 1;
+			break;
+		}
+	}
+
+	return rc;
+}
+
+void cli::cli_simple_loop(const char *prompt_)
 {
 	static char lastcommand[CONFIG_SYS_CBSIZE + 1] = { 0, };
 
@@ -279,8 +369,10 @@ void cli::cli_simple_loop(void)
 	int flag;
 	int rc = 1;
 
+	std::string prompt_i = std::string(prompt_);
+
 	for (;;) {
-		//fprintf(stderr, "%s ... \r\n", __func__);
+		//DLOGD( "%s ... prompt_:%s \r\n", __func__, prompt_);
 #if 0
 		if (rc >= 0) {
 			/* Saw enough of a valid command to
@@ -288,8 +380,13 @@ void cli::cli_simple_loop(void)
 			 */
 			bootretry_reset_cmd_timeout();
 		}
-#endif
-		len = cli_readline(CONFIG_SYS_PROMPT);
+#endif	
+		len = cli_readline(prompt_i.c_str());
+
+		if (is_exit_request()) {
+			//DLOGD( "%s, is_exit_request() == true \r\n", __func__);
+			break;
+		}
 
 		flag = 0;	/* assume no special flags for now */
 		if (len > 0)
@@ -313,14 +410,19 @@ void cli::cli_simple_loop(void)
 
 		if (len == -1)
 			puts("<INTERRUPT>\n");
-		else
-			rc = run_command_repeatable(lastcommand, flag);  // cli_simple_run_command
+		else {
+			if(mFlags & cli_FLAG_intercept_raw) {
+				rc = cli_intercept_command_repeatable(lastcommand, flag);
+			} else {
+				rc = run_command_repeatable(lastcommand, flag);  // cli_simple_run_command
+			}
+		}
 
 		if (rc <= 0) {
 			/* invalid command or not repeatable, forget it */
 			lastcommand[0] = 0;
 		}
-		if (rc == -10000) {
+		if (rc <= -10000 && rc >= -20000) {
 			break;
 		}
 	}

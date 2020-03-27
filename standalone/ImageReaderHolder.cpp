@@ -18,8 +18,14 @@
 #include <media/NdkImageReader.h>
 #include <unistd.h>
 
+
+#include "FootballConfig.h"
+
+
 #include "ImageReaderHolder.h"
 
+#undef __CLASS__
+#define __CLASS__ "ImageReaderHolder"
 
 /*static*/ void ImageReaderHolder::__s_cb(void* context, AImageReader* reader) {
 	ImageReaderHolder *holder = (ImageReaderHolder*)context;
@@ -48,7 +54,7 @@ ImageReaderHolder::~ImageReaderHolder() {
 		pthread_mutex_lock(&lockMutex);
 		is_destroying = true;
 		while (cb_is_ongoing == true) {
-			fprintf(stderr, "%s cb_is_ongoing \r\n", __func__);
+			DLOGD( "%s cb_is_ongoing \r\n", __func__);
 	        pthread_cond_wait(&lockCond, &lockMutex);
 	    }
 		AImageReader_setImageListener(mImageReader, nullptr);
@@ -77,11 +83,11 @@ ANativeWindow * ImageReaderHolder::getWindow() {
 }
 
 void ImageReaderHolder::test_fill_pattern() {
-	fprintf(stderr, "%s  ...\r\n", __func__);
+	DLOGD( "%s  ...\r\n", __func__);
 	
 	pthread_mutex_lock(&lockMutex);
 	if (is_destroying) {
-		fprintf(stderr, "%s is_destroying \r\n", __func__);
+		DLOGD( "%s is_destroying \r\n", __func__);
 		pthread_mutex_unlock(&lockMutex);
 		return ;
 	}
@@ -90,7 +96,7 @@ void ImageReaderHolder::test_fill_pattern() {
 	ANativeWindow_Buffer lockedBuffer;
 	int32_t ret = ANativeWindow_lock(mNativeWindow, &lockedBuffer, nullptr);
 	if (ret == 0) {
-		fprintf(stderr, "%s ANativeWindow_lock ok: %4dx%4d stride:%d \r\n", 
+		DLOGD( "%s ANativeWindow_lock ok: %4dx%4d stride:%d \r\n", 
 			__func__, lockedBuffer.width, lockedBuffer.height, lockedBuffer.stride);
 
 		uint32_t *start_ptr = (uint32_t*)lockedBuffer.bits;
@@ -112,9 +118,9 @@ void ImageReaderHolder::test_fill_pattern() {
 		ANativeWindow_unlockAndPost(mNativeWindow);
 	}
 	else {
-		fprintf(stderr, "%s ANativeWindow_lock fail: %d \r\n", __func__, ret);
+		DLOGD( "%s ANativeWindow_lock fail: %d \r\n", __func__, ret);
 	}
-	fprintf(stderr, "%s  done\r\n", __func__);
+	DLOGD( "%s  done\r\n", __func__);
 }
 void ImageReaderHolder::test_fill_from_file(long wait_ms) {
 
@@ -124,9 +130,9 @@ void ImageReaderHolder::cb(AImageReader* reader) {
 	AImage *image_ = nullptr;
 
 	pthread_mutex_lock(&lockMutex);
-	fprintf(stderr, "%s  ...\r\n", __func__);
+	DLOGD( "%s  ...\r\n", __func__);
 	if (is_destroying) {
-		fprintf(stderr, "%s is_destroying \r\n", __func__);
+		DLOGD( "%s is_destroying \r\n", __func__);
 		pthread_mutex_unlock(&lockMutex);
 		return ;
 	}
@@ -159,21 +165,21 @@ void ImageReaderHolder::cb(AImageReader* reader) {
 	pthread_mutex_lock(&lockMutex);
 	cb_is_ongoing = false;
 	pthread_cond_broadcast(&lockCond);
-	fprintf(stderr, "%s  done\r\n", __func__);
+	DLOGD( "%s  done\r\n", __func__);
 	pthread_mutex_unlock(&lockMutex);
 	
 }
 
 AImage *ImageReaderHolder::lockPendingImage() {
 	pthread_mutex_lock(&mutex);
-	fprintf(stderr, "%s  +++ \r\n", __func__);
+	DLOGD( "%s  +++ \r\n", __func__);
 	return mPendingImage;
 }
 int ImageReaderHolder::unlockPendingImage_andDelete() {
 	AImage_delete(mPendingImage);
 	mPendingImage = nullptr;
 	pthread_cond_broadcast(&cond);
-	fprintf(stderr, "%s  ---\r\n", __func__);
+	DLOGD( "%s  ---\r\n", __func__);
 	pthread_mutex_unlock(&mutex);
 	return 0;
 }

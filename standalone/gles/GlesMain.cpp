@@ -19,6 +19,8 @@
 
 #include <GLES3/gl3ext.h>
 
+#include "FootballConfig.h"
+
 
 #include "StbImageUtils.h"
 
@@ -26,6 +28,8 @@
 
 #include "GlesMain.h"
 
+#undef __CLASS__
+#define __CLASS__ "GlesMain"
 
 // Android log function wrappers
 static const char* kTAG = "native_app-gles";
@@ -35,7 +39,7 @@ static const char* kTAG = "native_app-gles";
 static bool initialized_ = false;
 bool InitGles(android_app_* app) {
 	LOGI("%s", __func__);
-	fprintf(stderr, "%s \r\n", __func__);
+	DLOGD( "%s \r\n", __func__);
 	initialized_ = true;
 
 	return true;
@@ -45,7 +49,7 @@ void DeleteGles(void) {
 	initialized_ = false;
 
 	LOGI("%s", __func__);
-	fprintf(stderr, "%s \r\n", __func__);
+	DLOGD( "%s \r\n", __func__);
 	return ;
 }
 
@@ -55,19 +59,19 @@ bool IsGlesReady(void) {
 
 int importAHardwareBufferAsGlesTexture(AHardwareBuffer *hardwareBuffer) {
 	LOGI("%s", __func__);
-	fprintf(stderr, "%s \r\n", __func__);
+	DLOGD( "%s \r\n", __func__);
 	return 0;
 }
 void DeleteImportedGlesTexture(int flags) {
 	LOGI("%s", __func__);
-	fprintf(stderr, "%s \r\n", __func__);
+	DLOGD( "%s \r\n", __func__);
 	return ;
 }
 
 bool GlesDrawFrame(void) {
 
 	LOGI("%s", __func__);
-	fprintf(stderr, "%s \r\n", __func__);
+	DLOGD( "%s \r\n", __func__);
 	return true;
 }
 

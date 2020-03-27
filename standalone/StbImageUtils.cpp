@@ -14,7 +14,12 @@
 #include <stb/stb_image_write.h>
 #endif
 
+#include "FootballConfig.h"
+
 #include "StbImageUtils.h"
+
+#undef __CLASS__
+#define __CLASS__ "StbImageUtils"
 
 int vk___stbi_write_png(char const *filename, int w, int h, int comp, const void  *data, int stride_in_bytes) {
 	return stbi_write_png(filename, w, h, comp, data, stride_in_bytes);

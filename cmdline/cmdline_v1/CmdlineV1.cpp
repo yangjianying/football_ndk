@@ -40,7 +40,7 @@ static int __quit(void *, int argc, char * const argv[]) {
 
 #define STR_C11_LITERAL(s) (s)
 
-CmdlineV1::CmdlineV1()    {
+CmdlineV1::CmdlineV1(): Cmdline()   {
 	//FrLOGV(LOG_TAG, "%s,%d +", __func__, __LINE__);
 
 	::NS_cmdline_v1::NS_menu_v1::MenuV1 *menu = new ::NS_cmdline_v1::NS_menu_v1::MenuV1();
@@ -62,9 +62,9 @@ void CmdlineV1::addInternalCmd() {
 		::NS_cmdline_v1::NS_menu_v1::MenuV1 *menu = (::NS_cmdline_v1::NS_menu_v1::MenuV1 *)impl1;
 		//menu->menuConfig(STR_C11_LITERAL("clversion"), 
 		//	STR_C11_LITERAL("cmdline tool " CMDLINE_TOOL_VERSION "(Based on Linux 3.18.6)"),NULL, NULL);
-		menu->menuConfig(STR_C11_LITERAL("clversion"), 
+		menu->menuConfig(STR_C11_LITERAL(kCmd_clversion), 
 			STR_C11_LITERAL("cmdline tool " CMDLINE_TOOL_VERSION),NULL, NULL);
-		menu->menuConfig(STR_C11_LITERAL("quit"),
+		menu->menuConfig(STR_C11_LITERAL(kCmd_quit),
 			STR_C11_LITERAL("Quit from cmdline tool"), __quit, NULL);
 	}
 }
@@ -74,9 +74,11 @@ void CmdlineV1::setPrompt(const char *prompt) {
 	::NS_cmdline_v1::NS_menu_v1::MenuV1 *menu = (::NS_cmdline_v1::NS_menu_v1::MenuV1 *)impl1;
 	menu->setPrompt(prompt);
 }
-void CmdlineV1::addEmptyCmdCallback(PF_empty_cmd_cb cb, void *ctx) {
+void CmdlineV1::add_on_empty_cmd(PF_on_empty_cmd cb, void *ctx) {
 }
-void CmdlineV1::onEmptyCmd() {
+void CmdlineV1::add_on_intercept_command(PF_on_intercept_command, void *ctx) {
+}
+void CmdlineV1::on_empty_cmd_i() {
 }
 
 int CmdlineV1::add(const char * cmd, const char * desc, int (*handler)(void *, int, char * const *), void *ctx) {
@@ -84,10 +86,15 @@ int CmdlineV1::add(const char * cmd, const char * desc, int (*handler)(void *, i
 	::NS_cmdline_v1::NS_menu_v1::MenuV1 *menu = (::NS_cmdline_v1::NS_menu_v1::MenuV1 *)impl1;
 	return menu->menuConfig(STR_C11_LITERAL(cmd), STR_C11_LITERAL(desc), handler, ctx);
 }
-
 int CmdlineV1::loop() {
 	::NS_cmdline_v1::NS_menu_v1::MenuV1 *menu = (::NS_cmdline_v1::NS_menu_v1::MenuV1 *)impl1;
 	return menu->loop();
+}
+int CmdlineV1::check_command_matched(const char * cmd, const char *matched_) {
+	return 0;
+}
+int CmdlineV1::postCommand(const char * cmd) {
+	return -1;
 }
 int CmdlineV1::runCommand(const char * cmd) {
 	return -1;

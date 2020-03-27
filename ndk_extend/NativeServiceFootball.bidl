@@ -1,0 +1,10 @@
+
+INTERFACE(0, dummy, void, 0, (), void);
+INTERFACE_r(1, dummy2, int, -1, (), void);
+INTERFACE_r(2, dummy3, int, -1, (a, b), int a, int b);
+
+INTERFACE_r(3, cmdline_transact, int32_t, -1, (input_, output_), const std::vector<std::string>& input_, std::vector<std::string>& output_);
+
+INTERFACE_r(4, register_receiver, int32_t, -1, (type_, binder_), int type_, void * binder_);
+INTERFACE_r(5, unregister_receiver, int32_t, -1, (type_), int type_);
+

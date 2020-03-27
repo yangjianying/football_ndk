@@ -53,26 +53,26 @@ class SyncTask {
   };
 
   explicit SyncTask(TaskHandler &task_handler) : task_handler_(task_handler) {
-  	//fprintf(stderr, "%s,%d instantiating \r\n", __func__, __LINE__);
+  	//DLOGD( "%s,%d instantiating \r\n", __func__, __LINE__);
     // Block caller thread until worker thread has started and ready to listen to task commands.
     // Worker thread will signal as soon as callback is received in the new thread.
     std::unique_lock<std::mutex> caller_lock(caller_mutex_);
     std::thread worker_thread(SyncTaskThread, this);
     worker_thread_.swap(worker_thread);
     caller_cv_.wait(caller_lock);
-	fprintf(stderr, "%s,%d instantiated.\r\n", __func__, __LINE__);
+	DLOGD( "%s,%d instantiated.\r\n", __func__, __LINE__);
   }
 
   ~SyncTask() {
-  	//fprintf(stderr, "%s,%d destroying \r\n", __func__, __LINE__);
+  	//DLOGD( "%s,%d destroying \r\n", __func__, __LINE__);
     // Task code does not matter here.
     PerformTask(task_code_, nullptr, true);
     worker_thread_.join();
-	fprintf(stderr, "%s,%d destroied \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d destroied \r\n", __func__, __LINE__);
   }
 
   void PerformTask(const TaskCode &task_code, TaskContext *task_context) {
-  	//fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+  	//DLOGD( "%s,%d \r\n", __func__, __LINE__);
     PerformTask(task_code, task_context, false);
   }
 
@@ -102,7 +102,7 @@ class SyncTask {
   }
 
   void OnThreadCallback() {
-  	//fprintf(stderr, "%s,%d starting \r\n", __func__, __LINE__);
+  	//DLOGD( "%s,%d starting \r\n", __func__, __LINE__);
     // Acquire worker lock and start waiting for events.
     // Wait must start before caller thread can post events, otherwise posted events will be lost.
     // Caller thread will be blocked until worker thread signals readiness.
@@ -110,7 +110,7 @@ class SyncTask {
 
     // New scope to limit scope of caller lock to this block.
     {
-    	//fprintf(stderr, "%s,%d started \r\n", __func__, __LINE__);
+    	//DLOGD( "%s,%d started \r\n", __func__, __LINE__);
       // Signal caller thread that worker thread is ready to listen to events.
       std::unique_lock<std::mutex> caller_lock(caller_mutex_);
       caller_cv_.notify_one();
@@ -131,7 +131,7 @@ class SyncTask {
       std::unique_lock<std::mutex> caller_lock(caller_mutex_);
       caller_cv_.notify_one();
     }
-	//fprintf(stderr, "%s,%d done \r\n", __func__, __LINE__);
+	//DLOGD( "%s,%d done \r\n", __func__, __LINE__);
   }
 
   TaskHandler &task_handler_;

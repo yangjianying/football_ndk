@@ -12,19 +12,10 @@
 
 #include <media/NdkImage.h>
 #include <media/NdkImageReader.h>
-#if 0
-#include <media/NdkMediaCodec.h>
-#include <media/NdkMediaCrypto.h>
-#include <media/NdkMediaDataSource.h>
-#include <media/NdkMediaDrm.h>
-#include <media/NdkMediaError.h>
-#include <media/NdkMediaExtractor.h>
-#include <media/NdkMediaFormat.h>
-#include <media/NdkMediaMuxer.h>
-#endif
 
-#include "FootballPP.h"
-#include "ANativeWindowUtils.h"
+#include "pp/FootballPP.h"
+#include "utils/ANativeWindowUtils.h"
+
 
 namespace computedemo1 {
 namespace impl {
@@ -32,25 +23,34 @@ namespace impl {
 class RenderingHandler;
 class HardwareBufferReader;
 
-class FootSessionVkImpl: public football::ImageReaderImageListenerWrapper {
+class FootSessionVkImpl: 
+	public ::football::FootballPP::FootballSession
+	, public football::HardwareBufferReader::CB
+	, public football::ImageReaderImageListenerWrapper 
+	{
 public:
-	FootSessionVkImpl(football::FootSession *session);
+	FootSessionVkImpl(int type_, ::football::SessionInfo &session);
 	virtual ~FootSessionVkImpl();
 	bool isValid();
-	int setSessionParameter(football::SessionParameter *parameter);
-	int getSessionParameter(football::SessionParameter *parameter);
-	void print();
+	
+	virtual int setSessionParameter(football::SessionParameter *parameter) override ;
+	virtual int getSessionParameter(football::SessionParameter *parameter) override ;
+	virtual void print() override ;
 
-	void processFrame(AHardwareBuffer *buffer);
-	virtual void onImageAvailableCallback(AImageReader *reader);
+	// impl public football::HardwareBufferReader::CB
+	virtual int on_process_frame(AHardwareBuffer *hardware_buffer) override;
 
-	football::FootSession mFootSession;
+	// iml public football::ImageReaderImageListenerWrapper 
+	virtual void onImageAvailableCallback(AImageReader *reader) override ;
+
+	int mType_ = 0;
+	football::SessionInfo & mSessionInfo;
 	football::SessionParameter mSessionParameter;
 	int mId = -1;
 	AImageReader *mReader = nullptr;
+	football::HardwareBufferReader *mHardwareBufferReader = nullptr;
 
 	RenderingHandler *mRenderingHandler = nullptr;
-	HardwareBufferReader *mHardwareBufferReader = nullptr;
 	std::mutex mRenderingHandler_lock;
 
 };

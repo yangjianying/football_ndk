@@ -1,10 +1,11 @@
 #ifndef __FOOTBALL_PP_GLES_H__
 #define __FOOTBALL_PP_GLES_H__
 
-#include<vector>
+#include <vector>
 #include <iostream>
 #include <string>
 #include <map>
+
 
 #include <android/native_window.h>  // ANativeWindow, ANativeWindow_Buffer
 #include <android/surface_control.h>
@@ -27,6 +28,16 @@
 #include "FootballPP.h"
 #include "ANativeWindowUtils.h"
 
+namespace gles {
+namespace session {
+namespace impl {
+
+class FootSessionGlesImpl1;
+
+};
+};
+};
+
 
 namespace football {
 
@@ -36,18 +47,21 @@ public:
 	
 	FootballPPGles();
 	virtual ~FootballPPGles() override;
-	virtual int buildSession(FootSession *session, int *session_id) override;
-	virtual int closeSession(int session_id) override;
-	virtual int setSessionParameter(int session_id, SessionParameter *parameter) override;
-	virtual int getSessionParameter(int session_id, SessionParameter *parameter) override;
-	virtual std::vector<int> getSessionIds() override;
-	virtual int getSession(int session_id, FootSession *session) override;
-	virtual void print(int session_id) override;
-
+	virtual int buildSession(int session_type, SessionInfo &session, int *session_id) override;
 
 	static void test1(int numCycle, long wait_ms);
 
 };
+
+class GlesTestRendererWrapper1{
+public:
+	GlesTestRendererWrapper1(ANativeWindow *window);
+	~GlesTestRendererWrapper1();
+	void renderFrame(AHardwareBuffer *buffer);
+private:
+	void *mImpl = nullptr;
+};
+
 
 };
 

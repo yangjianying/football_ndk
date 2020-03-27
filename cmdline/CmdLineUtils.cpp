@@ -28,9 +28,12 @@
 #include <iomanip>
 #include <list>
 
-
+#include "utils/football_debugger.h"
 
 #include "CmdLineUtils.h"
+
+#undef __CLASS__
+#define __CLASS__ "CmdLineUtils"
 
 namespace cycling {
 
@@ -129,59 +132,59 @@ void print2log_bytes(uint8_t *buf, uint32_t length, const char * prefix) {
 void print2log_bytes(std::vector<uint8_t> &buf, const char * prefix, const uint32_t line_num) {
 	int line_end = 0;
 	size_t length = buf.size();
-	fprintf(stderr, "%s", prefix);
+	DLOGD( "%s", prefix);
 	for(size_t i = 0; i < length; i++ ) {
 		line_end = 0;
-		fprintf(stderr, "%02X ", buf[i]);
+		DLOGD( "%02X ", buf[i]);
 		if(i % line_num == (line_num - 1)) {
 			line_end = 1;
-			fprintf(stderr, "\r\n");
+			DLOGD( "\r\n");
 			if (i != (length - 1)) {
-				fprintf(stderr, "%s", prefix);
+				DLOGD( "%s", prefix);
 			}
 		}
 	}
 	if (line_end == 0) {
-		fprintf(stderr, "\r\n");
+		DLOGD( "\r\n");
 	}
 }
 
 void print2log_bytes(uint8_t *buf, uint32_t length, const char * prefix, const uint32_t line_num) {
 	int line_end = 0;
 
-	fprintf(stderr, "%s", prefix);
+	DLOGD( "%s", prefix);
 	for(uint32_t i = 0; i < length; i++ ) {
 		line_end = 0;
-		fprintf(stderr, "%02X ", buf[i]);
+		DLOGD( "%02X ", buf[i]);
 		if(i % line_num == (line_num - 1)) {
 			line_end = 1;
-			fprintf(stderr, "\r\n");
+			DLOGD( "\r\n");
 			if (i != (length - 1)) {
-				fprintf(stderr, "%s", prefix);
+				DLOGD( "%s", prefix);
 			}
 		}
 	}
 	if (line_end == 0) {
-		fprintf(stderr, "\r\n");
+		DLOGD( "\r\n");
 	}
 }
 void print2log_bytes(uint16_t *buf, uint32_t length, const char * prefix, const uint32_t line_num) {
 	int line_end = 0;
 
-	fprintf(stderr, "%s", prefix);
+	DLOGD( "%s", prefix);
 	for(uint32_t i = 0; i < length; i++ ) {
 		line_end = 0;
-		fprintf(stderr, "%04X ", buf[i]);
+		DLOGD( "%04X ", buf[i]);
 		if(i % line_num == (line_num - 1)) {
 			line_end = 1;
-			fprintf(stderr, "\r\n");
+			DLOGD( "\r\n");
 			if (i != (length - 1)) {
-				fprintf(stderr, "%s", prefix);
+				DLOGD( "%s", prefix);
 			}
 		}
 	}
 	if (line_end == 0) {
-		fprintf(stderr, "\r\n");
+		DLOGD( "\r\n");
 	}
 }
 

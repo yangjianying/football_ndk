@@ -356,7 +356,24 @@ namespace vks
 			writeDescriptorSet.descriptorCount = descriptorCount;
 			return writeDescriptorSet;
 		}
-
+#if 1  // frankie, add for 
+		inline VkWriteDescriptorSet writeDescriptorSet(
+			VkDescriptorSet dstSet,
+			VkDescriptorType type,
+			uint32_t binding,
+			VkBufferView *bufferView_,
+			uint32_t descriptorCount = 1)
+		{
+			VkWriteDescriptorSet writeDescriptorSet {};
+			writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeDescriptorSet.dstSet = dstSet;
+			writeDescriptorSet.descriptorType = type;
+			writeDescriptorSet.dstBinding = binding;
+			writeDescriptorSet.pTexelBufferView = bufferView_;
+			writeDescriptorSet.descriptorCount = descriptorCount;
+			return writeDescriptorSet;
+		}
+#endif
 		inline VkVertexInputBindingDescription vertexInputBindingDescription(
 			uint32_t binding,
 			uint32_t stride,

@@ -34,8 +34,11 @@ namespace android {
  */
 class Program {
 public:
-    enum ProgramType { PROGRAM_UNKNOWN=0, PROGRAM_EXTERNAL_TEXTURE,
-            PROGRAM_TEXTURE_2D };
+    enum ProgramType {
+		PROGRAM_UNKNOWN=0, 
+		PROGRAM_EXTERNAL_TEXTURE,
+        PROGRAM_TEXTURE_2D
+    };
 
     Program() :
         mProgramType(PROGRAM_UNKNOWN),

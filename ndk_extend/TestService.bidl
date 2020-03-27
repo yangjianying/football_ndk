@@ -1,0 +1,6 @@
+
+INTERFACE(0, dummy, void, 0, (), void);
+INTERFACE_r(1, dummy2, int, -1, (), void);
+INTERFACE_r(2, dummy3, int, -1, (a, b), int a, int b);
+INTERFACE_r(2, dummy4, void *, nullptr, (a, b), void * a, void * b);
+

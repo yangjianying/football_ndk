@@ -242,6 +242,11 @@ void WaitOnNativeFence(int fd)
   }
 }
 
+/*
+lib/libfootball_static.a(glengine.cpp.o): In function `CreateNativeFence()':
+/home/yangjianying/disk3/football/football/pp/impl/gpu_tonemapper/glengine.cpp:256: undefined reference to `eglDupNativeFenceFDANDROID'
+*/
+#if 1
 //-----------------------------------------------------------------------------
 int CreateNativeFence()
 //-----------------------------------------------------------------------------
@@ -253,7 +258,8 @@ int CreateNativeFence()
   if (sync == EGL_NO_SYNC_KHR) {
     ALOGE("%s - Failed to Create Native Fence sync", __FUNCTION__);
   } else {
-    fd = eglDupNativeFenceFDANDROID(eglGetCurrentDisplay(), sync);
+    //fd = eglDupNativeFenceFDANDROID(eglGetCurrentDisplay(), sync);
+    fd = EGL_NO_NATIVE_FENCE_FD_ANDROID;  // frankie, add stub !!!
     if (fd == EGL_NO_NATIVE_FENCE_FD_ANDROID) {
       ALOGE("%s - Failed to dup sync", __FUNCTION__);
     }
@@ -262,6 +268,7 @@ int CreateNativeFence()
 
   return fd;
 }
+#endif
 
 //-----------------------------------------------------------------------------
 void engine_setDestination(int id, int x, int y, int w, int h)

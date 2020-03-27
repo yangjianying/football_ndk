@@ -25,10 +25,9 @@
 #include <EGL/egl.h>
 
 namespace android {
-
 #undef status_t
 #define status_t int32_t
-#undef int64_t
+#undef nsecs_t
 #define nsecs_t int64_t
 
 /*

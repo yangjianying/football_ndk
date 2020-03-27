@@ -85,7 +85,8 @@ print "Hello,world!"
 
 def connectDevcie():
     try:
-        deviceInfo= subprocess.check_output('adb devices').split("\r\n")
+        deviceInfo= subprocess.check_output('adb devices', shell=True).split("\n")
+        #print 'deviceInfo:', deviceInfo
         if deviceInfo[1]=='':
             return False
         else:
@@ -96,7 +97,8 @@ def connectDevcie():
 def getAndroidVersion():
     try:
         if connectDevcie():   
-            sysInfo= subprocess.check_output('adb shell cat /system/build.prop')
+            sysInfo= subprocess.check_output('adb shell cat /system/build.prop', shell=True)
+            #print 'sysInfo:', sysInfo
             androidVersion=re.findall("version.release=(\d\.\d)*",sysInfo , re.S)[0]
             return  androidVersion
         else:
@@ -107,39 +109,53 @@ def getAndroidVersion():
 def getDeviceName(): 
     try:
         if connectDevcie():
-            deviceInfo= subprocess.check_output('adb devices -l')
+            deviceInfo= subprocess.check_output('adb devices -l', shell=True)
             deviceName=re.findall(r'device product:(.*)\smodel',deviceInfo,re.S)[0]
             return  deviceName
         else:
             return "Connect Fail,Please reconnect Device..."
     except Exception,e:
         print "Get Device Name:",e
- 
-print "androidVersion:", getDeviceName(),"\n", "deviceName:", getAndroidVersion()
 
+#failed
+#print "androidVersion:", getDeviceName(),"\n", "deviceName:", getAndroidVersion()
 
+print "push assets ..."
 list = [
-("standalone/android-vulkan-tutorials/tutorial06_texture_v2/assets", "/sdcard/data/tutorial06_texture/"),
-("standalone/SaschaWillems/computedemo1/assets", "/sdcard/data/SaschaWillems/computedemo1/"),
-("SaschaWillems/android/examples/computeshader_foot/assets", "/sdcard/data/SaschaWillems/computeshader_foot/"),
-("SaschaWillems/android/examples/computeshader/assets", "/sdcard/data/SaschaWillems/computeshader/"),
-("SaschaWillems/android/examples/vulkanscene/assets", "/sdcard/data/SaschaWillems/vulkanscene/"),
-("SaschaWillems/android/examples/computeparticles/assets", "/sdcard/data/SaschaWillems/computeparticles/"),
-("SaschaWillems/android/examples/computeraytracing/assets", "/sdcard/data/SaschaWillems/computeraytracing/"),
-("SaschaWillems/android/examples/computecloth/assets", "/sdcard/data/SaschaWillems/computecloth/"),
-("SaschaWillems/android/examples/computecullandlod/assets", "/sdcard/data/SaschaWillems/computecullandlod/"),
+("standalone/android-vulkan-tutorials/tutorial06_texture_v2/assets", 	"tutorial06_texture/"),
+("standalone/SaschaWillems/computedemo1/assets", 			"SaschaWillems/computedemo1/"),
+("SaschaWillems/android/examples/computeshader_foot/assets", 		"SaschaWillems/computeshader_foot/"),
+("SaschaWillems/android/examples/computeshader/assets", 		"SaschaWillems/computeshader/"),
+("SaschaWillems/android/examples/vulkanscene/assets", 			"SaschaWillems/vulkanscene/"),
+("SaschaWillems/android/examples/computeparticles/assets", 		"SaschaWillems/computeparticles/"),
+("SaschaWillems/android/examples/computeraytracing/assets", 		"SaschaWillems/computeraytracing/"),
+("SaschaWillems/android/examples/computecloth/assets", 			"SaschaWillems/computecloth/"),
+("SaschaWillems/android/examples/computecullandlod/assets", 		"SaschaWillems/computecullandlod/"),
 ]
 
+# clean existing file , then push
 for item__ in list:
-    print "push ", item__[0], "\n  into ", item__[1]
-    subprocess.check_output('adb shell mkdir -p ' + item__[1])
-    subprocess.check_output('adb shell rm -rf ' + item__[1] + "*")
-    subprocess.check_output('adb push ' + item__[0] + ' ' + item__[1])
+    src_d = item__[0]
+    dest_d = "/sdcard/data/" + item__[1]
+    #dest_d = "/data/vendor/display/" + item__[1]
+    print "push ", src_d, "\n  into ", dest_d
+    subprocess.check_output('adb shell mkdir -p ' + dest_d, shell=True)
+    subprocess.check_output('adb shell rm -rf ' + dest_d + "*", shell=True)
+    subprocess.check_output('adb push ' + src_d + ' ' + dest_d, shell=True)
+    #
+    src_d = item__[0]
+    dest_d = "/data/vendor/display/" + item__[1]
+    print "push ", src_d, "\n  into ", dest_d
+    subprocess.check_output('adb shell mkdir -p ' + dest_d, shell=True)
+    subprocess.check_output('adb shell rm -rf ' + dest_d + "*", shell=True)
+    subprocess.check_output('adb push ' + src_d + ' ' + dest_d, shell=True)
 
 
-#input()
-#os.system("pause");
-#time.sleep(1);
+# only push
+print "push picture data to /sdcard/Pictures ..."
+subprocess.check_output('adb shell mkdir -p ' + '/sdcard/Pictures/', shell=True)
+subprocess.check_output('adb push ' + 'data/Pictures/ver2_2-tct' + ' ' + '/sdcard/Pictures/', shell=True)
 
 #if __name__ == '__main__':
 #    main(sys.argv[1:])
+

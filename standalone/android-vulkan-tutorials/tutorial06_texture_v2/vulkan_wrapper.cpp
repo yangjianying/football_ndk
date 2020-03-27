@@ -13,9 +13,15 @@
 // limitations under the License.
 // This file is generated.
 
+
+#include "FootballConfig.h"
+
 #include <android/log.h>
 #include "vulkan_wrapper.h"
 #include <dlfcn.h>
+
+#undef __CLASS__
+#define __CLASS__ "vulkan_wrapper"
 
 #if 1  // frankie, add
 // Android log function wrappers

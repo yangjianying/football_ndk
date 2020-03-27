@@ -369,7 +369,7 @@ namespace vks
 			}
 			else
 			{
-				printf("Error parsing '%s': '%s'\n", filename.c_str(), Importer.GetErrorString());
+				DLOGD("Error parsing '%s': '%s'\n", filename.c_str(), Importer.GetErrorString());
 #if defined(__ANDROID__)
 				LOGE("Error parsing '%s': '%s'", filename.c_str(), Importer.GetErrorString());
 #endif

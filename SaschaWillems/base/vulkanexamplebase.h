@@ -120,17 +120,21 @@ public: // frankie, // protected:
 	// Wraps the swap chain to present images (framebuffers) to the windowing system
 	VulkanSwapChain swapChain;
 	// Synchronization semaphores
-	struct {
+	struct SwapChainSynchronizationObjects{
 		// Swap chain image presentation
-		VkSemaphore presentComplete;
+		VkSemaphore presentComplete = VK_NULL_HANDLE;
 		// Command buffer submission and execution
-		VkSemaphore renderComplete;
-	} semaphores;
+		VkSemaphore renderComplete = VK_NULL_HANDLE;
+	};
+	SwapChainSynchronizationObjects semaphores;
+
+	std::vector<SwapChainSynchronizationObjects> mSwapChainSemaphores;  // frankie, add
+	
 	std::vector<VkFence> waitFences;
 public: 
 	bool prepared = false;
-	uint32_t width = 1280;
-	uint32_t height = 720;
+	uint32_t width = 1080; // 1280;
+	uint32_t height = 2340; // 720;
 
 	vks::UIOverlay UIOverlay;
 
@@ -251,10 +255,21 @@ public:
 	// dtor
 	virtual ~VulkanExampleBase();
 
+	/**
+	* Create the application wide Vulkan instance
+	*
+	* @note Virtual, can be overriden by derived example class for custom instance creation
+	*/
+	virtual VkResult createInstance(bool enableValidation);
+
 	// Setup the vulkan instance, enable required extensions and connect to the physical device (GPU)
 	bool initVulkan();
 
 #if defined(_WIN32)
+
+	// Render one frame of a render loop on platforms that sync rendering
+	void renderFrame();
+
 	void setupConsole(std::string title);
 	void setupDPIAwareness();
 	HWND setupWindow(HINSTANCE hinstance, WNDPROC wndproc);
@@ -314,12 +329,7 @@ public:
 	void initxcbConnection();
 	void handleEvent(const xcb_generic_event_t *event);
 #endif
-	/**
-	* Create the application wide Vulkan instance
-	*
-	* @note Virtual, can be overriden by derived example class for custom instance creation
-	*/
-	virtual VkResult createInstance(bool enableValidation);
+
 
 	// Pure virtual render function (override in derived class)
 	virtual void render() = 0;
@@ -341,24 +351,14 @@ public:
 
 	void createSynchronizationPrimitives();
 
-	// Creates a new (graphics) command pool object storing command buffers
-	void createCommandPool();
-	// Setup default depth and stencil views
-	virtual void setupDepthStencil();
-	// Create framebuffers for all requested swap chain images
-	// Can be overriden in derived class to setup a custom framebuffer (e.g. for MSAA)
-	virtual void setupFrameBuffer();
-	// Setup a default render pass
-	// Can be overriden in derived class to setup a custom render pass (e.g. for MSAA)
-	virtual void setupRenderPass();
-
-	/** @brief (Virtual) Called after the physical device features have been read, can be used to set features to enable on the device */
-	virtual void getEnabledFeatures();
-
 	// Connect and prepare the swap chain
 	void initSwapchain();
+
 	// Create swap chain images
 	void setupSwapChain();
+
+	// Creates a new (graphics) command pool object storing command buffers
+	void createCommandPool();
 
 	// Check if command buffers are valid (!= VK_NULL_HANDLE)
 	bool checkCommandBuffers();
@@ -373,25 +373,33 @@ public:
 	VkCommandBuffer createCommandBuffer(VkCommandBufferLevel level, bool begin);
 	// End the command buffer, submit it to the queue and free (if requested)
 	// Note : Waits for the queue to become idle
-	void flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free);
+	void flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free, VkFence fence_ = VK_NULL_HANDLE);
 
 	// Create a cache pool for rendering pipelines
 	void createPipelineCache();
 
+
+	// Setup default depth and stencil views
+	virtual void setupDepthStencil();
+	// Create framebuffers for all requested swap chain images
+	// Can be overriden in derived class to setup a custom framebuffer (e.g. for MSAA)
+	virtual void setupFrameBuffer();
+	// Setup a default render pass
+	// Can be overriden in derived class to setup a custom render pass (e.g. for MSAA)
+	virtual void setupRenderPass();
+
+	/** @brief (Virtual) Called after the physical device features have been read, can be used to set features to enable on the device */
+	virtual void getEnabledFeatures();
+
 	// Prepare commonly used Vulkan functions
 	virtual void prepare();
-
-	// Load a SPIR-V shader
-	VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
-	
-	// Start the main render loop
-	virtual void renderLoop();
 
 	//
 	void renderFrame__android_prepare();
 	void renderFrame__android();
-	// Render one frame of a render loop on platforms that sync rendering
-	void renderFrame();
+
+	// Start the main render loop
+	virtual void renderLoop();
 
 
 	void updateOverlay();
@@ -404,6 +412,13 @@ public:
 
 	// Submit the frames' workload 
 	void submitFrame();
+
+
+	// Load a SPIR-V shader
+	VkPipelineShaderStageCreateInfo loadShader(std::string fileName, VkShaderStageFlagBits stage);
+
+	VkPipelineShaderStageCreateInfo loadShader_from_strings_c(const char *source_str_, VkShaderStageFlagBits stage);
+	VkPipelineShaderStageCreateInfo loadShader_from_strings(const std::string &source_, VkShaderStageFlagBits stage);
 
 	/** @brief (Virtual) Called when the UI overlay is updating, can be used to add custom elements to the overlay */
 	virtual void OnUpdateUIOverlay(vks::UIOverlay *overlay);
@@ -435,12 +450,12 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)									\
 }																									
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
 // Android entry point
-#if 1
+#if 1  // frankie, add namespace
 #define VULKAN_EXAMPLE_MAIN(name, asset_path)	\
 static name::VulkanExample *vulkanExample; \
 void SaschaWillems_##name(android_app_* state) \
 { \
-	fprintf(stderr, ">> %s << \r\n", __func__); \
+	DLOGD( ">> %s << \r\n", __func__); \
 	::android_facade::AAssetManagerImpl_setAssetRootPath(asset_path); \
  \
 	vks::android::getDeviceConfig(); \

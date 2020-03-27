@@ -36,7 +36,6 @@
 #include <vector>
 #include <iostream>
 
-
 #if 0
 #include <xf86drm.h>
 #include <xf86drmMode.h>
@@ -46,39 +45,20 @@
 #include "drm/msm_drm.h"
 #endif
 
-//#include "CyclingColorConfig.h"
+#include "FootballConfig.h"
 
-//#include "cycling_utils/CyclingUtils.h"
-//#include "cycling_utils/cy_utils.h"
-//#include "Test1.h"
-
-
-#include "CmdLineUtils.h"
-
-#include "TestCmdMiniLed.h"
+#include "cmdline/CmdLineUtils.h"
 
 #include "mbi6322_reference_settings.h"
 
-#if 0
+#include "TestCmdMiniLed.h"
 
-#undef JNI_FR_DEBUG_H_
-#if 1  // must @ last
-#undef config_fr_DEBUG_EN
-#undef config_fr_DEBUG_TO_CONSOLE
-#define config_fr_DEBUG_EN 1  //  (1)
-#define config_fr_DEBUG_TO_CONSOLE 1  //  1 //  0
-#include "cycling_utils/cy_debug.h"
-#endif
-#undef LOG_TAG
-#define LOG_TAG "TestCmdMiniLed"
-
-#endif
 
 #undef UNUSED_
 #define UNUSED_(x) ((void)x)
 
-#undef LOG_TAG
-#define LOG_TAG stderr
+#undef __CLASS__
+#define __CLASS__ "TestCmdMiniLed"
 
 
 #define WITH_HW_SPI (1)
@@ -123,7 +103,7 @@ static const char *s_DIR_in = "in";
 static int echo_str_2sys_file(char *fullpath, char *str) {
 	int fd = open(fullpath, O_WRONLY);
 	if(fd == -1) {
-	  fprintf(stderr, "error:%s, %d \r\n", __func__, __LINE__);
+	  //DLOGD( "error:%s, %d \r\n", __func__, __LINE__);
 	  return -1;
 	}
 	write(fd, str , strlen(str)); 
@@ -134,11 +114,11 @@ static int read_int_from_sys_file(char *fullpath, int *value_) {
 	char buffer[8];
 	int fd = open(fullpath, O_RDONLY);
 	if(fd == -1) {
-	  fprintf(stderr, "error:%s, %d \r\n", __func__, __LINE__);
+	  DLOGD( "error:%s, %d \r\n", __func__, __LINE__);
 	  return -1;
 	}
     if((read(fd, buffer, sizeof(buffer))) < 0) {
-		fprintf(stderr, "error:%s, %d \r\n", __func__, __LINE__);
+		DLOGD( "error:%s, %d \r\n", __func__, __LINE__);
         return -1;
     }
 	close(fd); 
@@ -160,17 +140,17 @@ static int gpiosys_export_(int number) { UNUSED_(number);
 	snprintf(gpiosys_path_, 256, "/sys/class/gpio/gpio%d", number);
 
 	uint32_t access_flags = get_file_access_flags(gpiosys_path_);
-	//FrLOGV(LOG_TAG, "%s, access:0x%02x", gpiosys_path_, access_flags);
+	//FrLOGV( "%s, access:0x%02x", gpiosys_path_, access_flags);
 	if (access_flags == 0x0f) {
 
 		#if 0
 		memset(gpiosys_path_, 0, 256);
 		snprintf(gpiosys_path_, 256, "/sys/class/gpio/gpio%d/direction", number);
-		FrLOGV(LOG_TAG, "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
+		FrLOGV( "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
 		
 		memset(gpiosys_path_, 0, 256);
 		snprintf(gpiosys_path_, 256, "/sys/class/gpio/gpio%d/value", number);
-		FrLOGV(LOG_TAG, "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
+		FrLOGV( "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
 		#endif
 		
 		return 1;
@@ -184,11 +164,11 @@ static int gpiosys_export_(int number) { UNUSED_(number);
 #if 0
 	memset(gpiosys_path_, 0, 256);
 	snprintf(gpiosys_path_, 256, "/sys/class/gpio/gpio%d/direction", number);
-	FrLOGV(LOG_TAG, "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
+	FrLOGV( "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
 	
 	memset(gpiosys_path_, 0, 256);
 	snprintf(gpiosys_path_, 256, "/sys/class/gpio/gpio%d/value", number);
-	FrLOGV(LOG_TAG, "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
+	FrLOGV( "%s, access:0x%02x", gpiosys_path_, get_file_access_flags(gpiosys_path_));
 #endif
 
 	return echo_ret;
@@ -247,11 +227,11 @@ static int gpiosys_opt_output_(int number, int out_value_) { UNUSED_(number); UN
 		snprintf(gpiosys_path_, 256, "/sys/class/gpio/gpio%d/value", number);
 		fd = open(gpiosys_path_, O_WRONLY);
 		if(fd == -1) {
-		  fprintf(stderr, "error:%s, %d \r\n", __func__, __LINE__);
+		  DLOGD( "error:%s, %d \r\n", __func__, __LINE__);
 		  return -1;
 		}
 		s_fd_map[number - GPIOSYS_PINCTRL_BASE] = fd;
-		//fprintf(stderr, "%04d = %d \r\n", number -GPIOSYS_PINCTRL_BASE , fd);
+		//DLOGD( "%04d = %d \r\n", number -GPIOSYS_PINCTRL_BASE , fd);
 	}
 	fd = s_fd_map[number - GPIOSYS_PINCTRL_BASE];
 
@@ -270,18 +250,18 @@ static int gpiosys_opt_get_input_(int number) { UNUSED_(number);
 		snprintf(gpiosys_path_, 256, "/sys/class/gpio/gpio%d/value", number);
 		fd = open(gpiosys_path_, O_RDONLY);
 		if(fd == -1) {
-		  fprintf(stderr, "error:%s, %d \r\n", __func__, __LINE__);
+		  DLOGD( "error:%s, %d \r\n", __func__, __LINE__);
 		  return 0;
 		}
 		s_fd_map[number - GPIOSYS_PINCTRL_BASE] = fd;
-		//fprintf(stderr, "%04d = %d \r\n", number - GPIOSYS_PINCTRL_BASE, fd);
+		//DLOGD( "%04d = %d \r\n", number - GPIOSYS_PINCTRL_BASE, fd);
 	}
 	fd = s_fd_map[number - GPIOSYS_PINCTRL_BASE];
 	
 	char buffer[8];
 	int value_;
     if((read(fd, buffer, sizeof(buffer))) < 0) {
-		//fprintf(stderr, "error:%s, %d \r\n", __func__, __LINE__);
+		//DLOGD( "error:%s, %d \r\n", __func__, __LINE__);
         return 0;
     }
 	return atoi(buffer);
@@ -325,7 +305,11 @@ static const int s_GPIOSYS_input_pins[] = {
 #define s_GPIOSYS_input_pins_SIZE (sizeof(s_GPIOSYS_input_pins)/sizeof(s_GPIOSYS_input_pins[0]))
 #endif
 
+static int initControl_gpio_pins_flag = 0;
 static void initControl_gpio_pins() {
+	if (initControl_gpio_pins_flag == 0) {
+	initControl_gpio_pins_flag = 1;
+	DLOGD( "%s first call ... \r\n", __func__);
 	for(int i=0;i<s_GPIOSYS_output_pins_SIZE;i++) {
 		int direction_ret = -1;
 		int export_ret = gpiosys_export_(s_GPIOSYS_output_pins[i]);
@@ -335,7 +319,7 @@ static void initControl_gpio_pins() {
 				gpiosys_output_(s_GPIOSYS_output_pins[i], 0);
 			}
 		}
-		//FrLOGV(LOG_TAG, "out gpio: %02d export :%d dir: %s", s_GPIOSYS_output_pins[i] - GPIOSYS_PINCTRL_BASE, export_ret
+		//FrLOGV( "out gpio: %02d export :%d dir: %s", s_GPIOSYS_output_pins[i] - GPIOSYS_PINCTRL_BASE, export_ret
 		//	, (direction_ret == 0 ? "ok" : "failed"));
 	}
 #if 0
@@ -345,11 +329,14 @@ static void initControl_gpio_pins() {
 		if (export_ret == 0 || export_ret == 1) {
 			direction_ret = gpiosys_direction_input_(s_GPIOSYS_input_pins[i]);
 		}
-		FrLOGV(LOG_TAG, "in gpio: %02d export :%d dir: %s", s_GPIOSYS_input_pins[i] - GPIOSYS_PINCTRL_BASE, export_ret
+		FrLOGV( "in gpio: %02d export :%d dir: %s", s_GPIOSYS_input_pins[i] - GPIOSYS_PINCTRL_BASE, export_ret
 			, (direction_ret == 0 ? "ok" : "failed"));
 	}
 #endif
-
+	}
+	else {
+		DLOGD( "%s already called. \r\n", __func__);
+	}
 }
 
 class SpiDeviceIntf {
@@ -382,9 +369,22 @@ public:
 	uint32_t mTxStagingCnt = 0;
 	uint16_t mTxStagingBuffer[STAGING_SIZE];
 	uint16_t mRxStagingBuffer[STAGING_SIZE];
-	
+
+	SpiDevice(const char * device_): mDevice(device_), mFd(open(mDevice, O_RDWR)) {
+		//FrLOGV( "%s,%d  mFd:%d ", __func__, __LINE__, mFd);
+		initControl_gpio_pins();
+
+		if (mFd > 0) {
+			setup();
+		}
+	}
+	virtual ~SpiDevice() {
+		close(mFd);
+		//FrLOGV( "%s,%d", __func__, __LINE__);
+	}
+
 	void pabort(const char *s) {
-		fprintf(stderr, "*** pabort:%s \r\n", s);
+		DLOGD( "*** pabort:%s \r\n", s);
 	}
 
 	void setup() {
@@ -449,11 +449,11 @@ public:
 			pabort("can't get LSB_FIRST"); return ;
 		}
 
-		fprintf(stderr, "spi mode: 0x%02x/0x%02x \n", mode_, mode_r);
-		fprintf(stderr, "bits per word: %d/%d \n", bits_, bits_r);
-		fprintf(stderr, "max speed: %d Hz (%d KHz) / %d Hz (%d KHz) \n", 
+		DLOGD( "spi mode: 0x%02x/0x%02x \n", mode_, mode_r);
+		DLOGD( "bits per word: %d/%d \n", bits_, bits_r);
+		DLOGD( "max speed: %d Hz (%d KHz) / %d Hz (%d KHz) \n", 
 			speed_, speed_/1000, speed_r, speed_r/1000);
-		fprintf(stderr, "lsb_ : %d \r\n" , lsb_);
+		DLOGD( "lsb_ : %d \r\n" , lsb_);
 
 		mValid = 1;
 	}
@@ -462,7 +462,7 @@ public:
 // 16bits spidev test ok !!!
 int transfer(uint16_t* txBuffer, uint16_t* rxBuffer, uint32_t size_) {
 	if (mValid == 0) {
-		fprintf(stderr, "%s,%d error!\r\n", __func__, __LINE__);
+		DLOGD( "%s,%d error!\r\n", __func__, __LINE__);
 		return -1;
 	}
 	int ret;
@@ -479,12 +479,12 @@ int transfer(uint16_t* txBuffer, uint16_t* rxBuffer, uint32_t size_) {
 		pabort("can't send spi message");
 		return -1;
 	}
-	//fprintf(stderr, "%s %u done! \r\n", __func__, size_);
+	//DLOGD( "%s %u done! \r\n", __func__, size_);
 	return 0;
 }
 virtual int readRegister(uint16_t address, uint16_t *value_) override {
 	if (mValid == 0) {
-		fprintf(stderr, "%s,%d error!\r\n", __func__, __LINE__);
+		DLOGD( "%s,%d error!\r\n", __func__, __LINE__);
 		return -1;
 	}
 	int ret = 0;
@@ -503,10 +503,10 @@ virtual int readRegisterBatch(uint16_t address, int len, uint16_t *value_, int *
 	UNUSED_(address); UNUSED_(len); UNUSED_(value_); UNUSED_(r_len);
 
 	if (mValid == 0) {
-		fprintf(stderr, "%s,%d error!\r\n", __func__, __LINE__);
+		DLOGD( "%s,%d error!\r\n", __func__, __LINE__);
 		return -1;
 	}
-	fprintf(stderr, "%s len = %d \n", __func__, len);
+	DLOGD( "%s len = %d \n", __func__, len);
 	int ret = 0;
 	address <<= 1; address += 1;
 	mTxStagingCnt = 0;
@@ -527,7 +527,7 @@ virtual int readRegisterBatch(uint16_t address, int len, uint16_t *value_, int *
 }
 virtual int writeRegister(uint16_t address, uint16_t value_) override {
 	if (mValid == 0) {
-		fprintf(stderr, "%s,%d error!\r\n", __func__, __LINE__);
+		//DLOGD( "%s,%d error!\r\n", __func__, __LINE__);
 		return -1;
 	}
 	int ret = 0;
@@ -541,10 +541,10 @@ virtual int writeRegister(uint16_t address, uint16_t value_) override {
 virtual int writeRegisterBatch(uint16_t address, uint16_t* value_, int len) override {
 	UNUSED_(address); UNUSED_(len); UNUSED_(value_); 
 	if (mValid == 0) {
-		fprintf(stderr, "%s,%d error!\r\n", __func__, __LINE__);
+		DLOGD( "%s,%d error!\r\n", __func__, __LINE__);
 		return -1;
 	}
-	fprintf(stderr, "%s len = %d \n", __func__, len);
+	DLOGD( "%s len = %d \n", __func__, len);
 	int ret = 0;
 	address <<= 1; address += 0;
 	mTxStagingCnt = 0;
@@ -579,7 +579,7 @@ virtual int writeRegisterBatch(uint16_t address, uint16_t* value_, int len) over
 			pabort("can't send spi message");
 			return -1;
 		}
-		//fprintf(stderr, "%s %u done! \r\n", __func__, size_);
+		//DLOGD( "%s %u done! \r\n", __func__, size_);
 		return 0;
 	}
 	virtual int readRegister(uint16_t address, uint16_t *value_) override {
@@ -591,7 +591,7 @@ virtual int writeRegisterBatch(uint16_t address, uint16_t* value_, int len) over
 		mTxStagingCnt = 0;
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>8)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>0)&0xff;
-		fprintf(stderr, "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
+		DLOGD( "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
 		mTxStagingBuffer[mTxStagingCnt++] = 0;
 		mTxStagingBuffer[mTxStagingCnt++] = 0;
 		ret = transfer(mTxStagingBuffer, mRxStagingBuffer, mTxStagingCnt);
@@ -614,7 +614,7 @@ virtual int writeRegisterBatch(uint16_t address, uint16_t* value_, int len) over
 		mTxStagingCnt = 0;
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>8)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>0)&0xff;
-		fprintf(stderr, "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
+		DLOGD( "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
 		for(int i=0;i<len;i++) {
 			mTxStagingBuffer[mTxStagingCnt++] = 0;
 			mTxStagingBuffer[mTxStagingCnt++] = 0;
@@ -643,7 +643,7 @@ virtual int writeRegisterBatch(uint16_t address, uint16_t* value_, int len) over
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>0)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = (value_>>8)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = (value_>>0)&0xff;
-		//fprintf(stderr, "-> %02X %02X %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1], mTxStagingBuffer[2], mTxStagingBuffer[3]);
+		//DLOGD( "-> %02X %02X %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1], mTxStagingBuffer[2], mTxStagingBuffer[3]);
 		ret = transfer(mTxStagingBuffer, mRxStagingBuffer, mTxStagingCnt);
 		return ret;
 	}
@@ -661,22 +661,11 @@ virtual int writeRegisterBatch(uint16_t address, uint16_t* value_, int len) over
 			mTxStagingBuffer[mTxStagingCnt++] = (value_[i]>>8)&0xff;
 			mTxStagingBuffer[mTxStagingCnt++] = (value_[i]>>0)&0xff;
 		}
-		fprintf(stderr, "-> %02X %02X %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1], mTxStagingBuffer[2], mTxStagingBuffer[3]);
+		DLOGD( "-> %02X %02X %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1], mTxStagingBuffer[2], mTxStagingBuffer[3]);
 		ret = transfer(mTxStagingBuffer, mRxStagingBuffer, mTxStagingCnt);
 		return ret;
 	}
 #endif
-	SpiDevice(const char * device_): mDevice(device_), mFd(open(mDevice, O_RDWR)) {
-		//FrLOGV(LOG_TAG, "%s,%d  mFd:%d ", __func__, __LINE__, mFd);
-		if (mFd > 0) {
-			setup();
-		}
-	}
-	virtual ~SpiDevice() {
-		close(mFd);
-		//FrLOGV(LOG_TAG, "%s,%d", __func__, __LINE__);
-	}
-	
 
 };
 
@@ -698,35 +687,43 @@ static const int s_GPIOSYS_input_pins_spi[] = {
 
 static int initSpi_gpio_pins_flag = 0;
 static void initSpi_gpio_pins() {
-	//FrLOGV(LOG_TAG, "%s,%d", __func__, __LINE__);
-	for(int i=0;i<s_GPIOSYS_output_pins_spi_SIZE;i++) {
-		int direction_ret = -1;
-		int export_ret = gpiosys_export_(s_GPIOSYS_output_pins_spi[i]);
-		if (export_ret == 0 || export_ret == 1) {
-			direction_ret = gpiosys_direction_output_(s_GPIOSYS_output_pins_spi[i]);
-			if (direction_ret == 0) {
-				gpiosys_output_(s_GPIOSYS_output_pins_spi[i], 0);
+	if (initSpi_gpio_pins_flag == 0) {
+		DLOGD( "%s first call ... \r\n", __func__);
+		initSpi_gpio_pins_flag = 1;
+		//FrLOGV( "%s,%d", __func__, __LINE__);
+		for(int i=0;i<s_GPIOSYS_output_pins_spi_SIZE;i++) {
+			int direction_ret = -1;
+			int export_ret = gpiosys_export_(s_GPIOSYS_output_pins_spi[i]);
+			if (export_ret == 0 || export_ret == 1) {
+				direction_ret = gpiosys_direction_output_(s_GPIOSYS_output_pins_spi[i]);
+				if (direction_ret == 0) {
+					gpiosys_output_(s_GPIOSYS_output_pins_spi[i], 0);
+				}
 			}
+			//FrLOGV( "spi out gpio: %02d export :%d dir: %s", s_GPIOSYS_output_pins_spi[i] - GPIOSYS_PINCTRL_BASE, export_ret
+			//	, (direction_ret == 0 ? "ok" : "failed"));
 		}
-		//FrLOGV(LOG_TAG, "spi out gpio: %02d export :%d dir: %s", s_GPIOSYS_output_pins_spi[i] - GPIOSYS_PINCTRL_BASE, export_ret
-		//	, (direction_ret == 0 ? "ok" : "failed"));
-	}
 #if 1
-	for(int i=0;i<s_GPIOSYS_input_pins_spi_SIZE;i++) {
-		int direction_ret = -1;
-		int export_ret = gpiosys_export_(s_GPIOSYS_input_pins_spi[i]);
-		if (export_ret == 0 || export_ret == 1) {
-			direction_ret = gpiosys_direction_input_(s_GPIOSYS_input_pins_spi[i]);
+		for(int i=0;i<s_GPIOSYS_input_pins_spi_SIZE;i++) {
+			int direction_ret = -1;
+			int export_ret = gpiosys_export_(s_GPIOSYS_input_pins_spi[i]);
+			if (export_ret == 0 || export_ret == 1) {
+				direction_ret = gpiosys_direction_input_(s_GPIOSYS_input_pins_spi[i]);
+			}
+			//FrLOGV( "spi in gpio: %02d export :%d dir: %s", s_GPIOSYS_input_pins_spi[i] - GPIOSYS_PINCTRL_BASE, export_ret
+			//	, (direction_ret == 0 ? "ok" : "failed"));
 		}
-		//FrLOGV(LOG_TAG, "spi in gpio: %02d export :%d dir: %s", s_GPIOSYS_input_pins_spi[i] - GPIOSYS_PINCTRL_BASE, export_ret
-		//	, (direction_ret == 0 ? "ok" : "failed"));
-	}
 #endif
-	PIN_OUT_VALUE(PIN_CHIP_CS1_N, 1);
-	PIN_OUT_VALUE(PIN_CHIP_CS2_N, 1);
-	PIN_OUT_VALUE(PIN_CHIP_SCLK, 0);
-	PIN_OUT_VALUE(PIN_CHIP_MOSI, 0);
+		PIN_OUT_VALUE(PIN_CHIP_CS1_N, 1);
+		PIN_OUT_VALUE(PIN_CHIP_CS2_N, 1);
+		PIN_OUT_VALUE(PIN_CHIP_SCLK, 0);
+		PIN_OUT_VALUE(PIN_CHIP_MOSI, 0);
+	}
+	else {
+		DLOGD( "%s already called \r\n", __func__);
+	}
 }
+
 class SpiDeviceGpio: public SpiDeviceIntf {
 public:
 	int mCs = 0;
@@ -735,14 +732,11 @@ public:
 	volatile uint8_t mRxStagingBuffer[STAGING_SIZE];
 
 	SpiDeviceGpio(int cs_): mCs(cs_) {
-		fprintf(LOG_TAG, "%s,%d ", __func__, __LINE__);
-		if (initSpi_gpio_pins_flag == 0) {
-			initSpi_gpio_pins_flag = 1;
-			initSpi_gpio_pins();
-		}
+		DLOGD( "%s,%d ", __func__, __LINE__);
+		initSpi_gpio_pins();
 	}
 	virtual ~SpiDeviceGpio() {
-		fprintf(stderr, "%s,%d ", __func__, __LINE__);
+		DLOGD( "%s,%d ", __func__, __LINE__);
 	}
 
 #define SET_out_value_ PIN_OUT_VALUE
@@ -761,11 +755,11 @@ public:
 			uint8_t tx_ = txBuffer[i];
 			uint8_t rx_ = 0;
 #if transfer_debug
-			fprintf(stderr, "%04d - tx:%02x ", i, tx_);
+			DLOGD( "%04d - tx:%02x ", i, tx_);
 #endif
 			for(int clk_ = 0; clk_ < 8; clk_++) {
 #if transfer_debug
-				fprintf(stderr, "%02x%s ", shift_bit, (tx_&shift_bit ? "(1)" : "(0)"));
+				DLOGD( "%02x%s ", shift_bit, (tx_&shift_bit ? "(1)" : "(0)"));
 #endif
 				if(tx_&shift_bit) { SET_out_value_(PIN_CHIP_MOSI, 1); }
 				else { SET_out_value_(PIN_CHIP_MOSI, 0); }
@@ -788,8 +782,8 @@ public:
 				usleep(1);
 			}
 #if transfer_debug
-			fprintf(stderr, "rx:%02x ", rx_);
-			fprintf(stderr, "\r\n");
+			DLOGD( "rx:%02x ", rx_);
+			DLOGD( "\r\n");
 #endif
 			rxBuffer[i] = rx_;
 		}
@@ -803,7 +797,7 @@ public:
 		return 0;
 	}
 	virtual int readRegister(uint16_t address, uint16_t *value_) override { UNUSED_(address); UNUSED_(value_);
-		fprintf(stderr, "%s:0x%04x \r\n", __func__, address);
+		DLOGD( "%s:0x%04x \r\n", __func__, address);
 		int ret = 0;
 		address <<= 1; address += 1;
 		mTxStagingCnt = 0;
@@ -811,7 +805,7 @@ public:
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>0)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = 0;
 		mTxStagingBuffer[mTxStagingCnt++] = 0;
-		fprintf(stderr, "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
+		DLOGD( "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
 		ret = transfer(mTxStagingBuffer, mRxStagingBuffer, mTxStagingCnt);
 		if (ret == 0) {
 			uint16_t r_value = mRxStagingBuffer[2];
@@ -819,12 +813,12 @@ public:
 			r_value += mRxStagingBuffer[3];
 			*value_ = r_value;
 		}
-		//fprintf(stderr, "read %04x : %04x \r\n", address, *value_);
+		//DLOGD( "read %04x : %04x \r\n", address, *value_);
 		return ret;	
 	}
 	virtual int readRegisterBatch(uint16_t address, int len, uint16_t *value_, int *r_len) override {
 		UNUSED_(address); UNUSED_(len); UNUSED_(value_); UNUSED_(r_len);
-		fprintf(stderr, "%s:0x%04x len=%d \r\n", __func__, address, len);
+		DLOGD( "%s:0x%04x len=%d \r\n", __func__, address, len);
 		int ret = 0;
 		address <<= 1; address += 1;
 		mTxStagingCnt = 0;
@@ -834,7 +828,7 @@ public:
 			mTxStagingBuffer[mTxStagingCnt++] = 0;
 			mTxStagingBuffer[mTxStagingCnt++] = 0;
 		}
-		fprintf(stderr, "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
+		DLOGD( "-> %02X %02X \r\n", mTxStagingBuffer[0], mTxStagingBuffer[1]);
 		ret = transfer(mTxStagingBuffer, mRxStagingBuffer, mTxStagingCnt);
 		if (ret == 0) {
 			if (r_len != nullptr) {
@@ -850,7 +844,7 @@ public:
 		return ret;
 	}
 	virtual int writeRegister(uint16_t address, uint16_t value_) override { UNUSED_(address); UNUSED_(value_);
-		fprintf(stderr, "%s:0x%04x value_=0x%04x \r\n", __func__, address, value_);
+		DLOGD( "%s:0x%04x value_=0x%04x \r\n", __func__, address, value_);
 		int ret = 0;
 		address <<= 1; address += 0;
 		mTxStagingCnt = 0;
@@ -858,19 +852,19 @@ public:
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>0)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = (value_>>8)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = (value_>>0)&0xff;
-		fprintf(stderr, "%s, -> %02X %02X \r\n", __func__, mTxStagingBuffer[0], mTxStagingBuffer[1]);
+		DLOGD( "%s, -> %02X %02X \r\n", __func__, mTxStagingBuffer[0], mTxStagingBuffer[1]);
 		ret = transfer(mTxStagingBuffer, mRxStagingBuffer, mTxStagingCnt);
 		return ret;
 	}
 	virtual int writeRegisterBatch(uint16_t address, uint16_t* value_, int len) override {
-		fprintf(stderr, "%s:0x%04x len=%d \r\n", __func__, address, len);
+		DLOGD( "%s:0x%04x len=%d \r\n", __func__, address, len);
 		UNUSED_(address); UNUSED_(len); UNUSED_(value_);
 		int ret = 0;
 		address <<= 1; address += 0;
 		mTxStagingCnt = 0;
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>8)&0xff;
 		mTxStagingBuffer[mTxStagingCnt++] = (address>>0)&0xff;
-		fprintf(stderr, "%s, -> %02X %02X \r\n", __func__, mTxStagingBuffer[0], mTxStagingBuffer[1]);
+		DLOGD( "%s, -> %02X %02X \r\n", __func__, mTxStagingBuffer[0], mTxStagingBuffer[1]);
 		for(int i=0;i<len;i++) {
 			mTxStagingBuffer[mTxStagingCnt++] = (value_[i]>>8)&0xff;
 			mTxStagingBuffer[mTxStagingCnt++] = (value_[i]>>0)&0xff;
@@ -879,212 +873,15 @@ public:
 		return ret;
 	}
 
+
 };
 
-/*
-PLL M>16
-0.5MHz < internal oscillator/PLL N < 2MHz ··················································································· (6)
-40MHz < (internal oscillator/PLL N)× PLL M < 200MHz ········································································ (7)
-PLL frequency = ((internal oscillator × PLL M)/(PLL N × PLL O)) ······································································· (8)
-GCLK frequency = PLL frequency / GCLK frequency divider
 
-internal oscillator	5.85 MHz
-PLL M	58
-PLL N	5
-PLL O	1
-PLL frequency	67.86 MHz
-GCLK frequency divider	[000011] (divided by 4 )
-GCLK frequency	16.96 MHz
+//#include "reg_override_1.h"
+//#include "reg_override_old.h"
+//#include "reg_override_old_10.h"
+#include "reg_override_old_10_dead_dummy.h"
 
-PLL M	48	PLL N	6	PLL O	3	GCLK_Frequency_Divider(5)	// PLL=15.6MHz 	GCLK = 3.12MHz (0.3205 us)
-PLL M	58	PLL N	5	PLL O	1	GCLK_Frequency_Divider(5)	// 67.86MHz		13.572MHz(0.074 us)
-PLL M	75	PLL N	5	PLL O	1	GCLK_Frequency_Divider(5)	// 87.75MHz 	17.55 MHz(0.056898us ~ 57ns)
-
-
-Dummy time = Dummy time width x GCLK cycle > 1us
-
-Dead time = Dead time width x GCLK cycle > 3us
-
-Scramble time= The total number of GCLKs in Scramble × GCLK cycle time
-(Dummy time + Scramble time + Dead time) × the number of scrambles	// one line
-	x the number of scans < 16.6ms									// one frame 
-
-*/
-static uint16_t reg_value_override(uint16_t addr_, uint16_t value_) {
-#define PWM_mode 0
-	//[0]: continue mode
-	//[1]: one shot mode
-#define PWM_data_bit (0x02) // 0x00
-	//				The total number of GCLKs
-	//[000]: 14-bit		16384
-	//[001]: 13-bit		8192
-	//[010]: 12-bit		4096
-	//[011]: 11-bit		2048
-	//[100]: 10-bit		1024
-	//[101]~[111]: same as code [000] 16384
-#define PWM_counting_mode 0x01
-	//[00]: odd channel forward counting mode/even channel backward counting mode
-	//[01]: all channel forward counting mode
-	//[10]: all channel backward
-	//[11]: same as code [00]
-#define Chip_sleep_mode_enable 0
-	//[0]: Disable
-	//[1]: Enable
-#define Chip_sleep_select 0
-	//[0]: wakeup for brightness have value
-	//[1]: wakeup for vsync
-#define SYNC_pin_enable 0
-	//[0]: vsync command valid, SYNC pin disable
-	//[1]: vsync command invalid, SYNC pin enable
-#define Scramble_number 0x00 // 0x01	// 0x03
-	//[00]: 1 scramble
-	//[01]: 4 scramble
-	//[10]: 8 scramble
-	//[11]: 16 scramble
-#define Scan_number 0x07 //0x7
-	//[0000]: 1 lines; [1000]: 9 lines;
-	//[0001]: 2 lines; [1001]: 10 lines;
-	//[0010]: 3 lines; [1010]: 11 lines;
-	//[0011]: 4 lines; [1011]: 12 lines;
-	//[0100]: 5 lines; [1100]: 13 lines;
-	//[0101]: 6 lines; [1101]: 14 lines;
-	//[0110]: 7 lines; [1110]: 15 lines;
-	//[0111]: 8 lines; [1111]: 16 lines;
-	if (addr_ == 0X0000) { return 
-(PWM_mode<<0xf | PWM_data_bit <<0xc | PWM_counting_mode<<0xa | Chip_sleep_mode_enable <<0x9 | Chip_sleep_select <<0x8 | SYNC_pin_enable<<0x6 | Scramble_number<<0x4 | Scan_number<<0x0); } // 0x8037
-//-----------------------------------------------------------------------------------------------------------------------------
-	// Dummy time width
-	else if(addr_ == 0X0001) { return 0x0018; }	// 0x0018 // Reserve
-//-----------------------------------------------------------------------------------------------------------------------------
-	// Dead time width
-	else if(addr_ == 0X0002) { return 0x0048; }	// 0x0048 // Reserve
-//-----------------------------------------------------------------------------------------------------------------------------
-	// Scan change period
-	else if(addr_ == 0X0003) { return 0x0018; }	// 0x0018 // scan change period. SC[15:0] x GCLK period
-//----------------------------------------------------------------------------------------------------------------------------
-	// Scan separate period
-	else if(addr_ == 0X0004) { return 0x0018; }	// 0x0018 // MOS separate period, MS[15:0] x GCLK period
-//-----------------------------------------------------------------------------------------------------------------------------
-#define Channel_parallel_defined 0x00
-	//[00]: 32 channel define
-	//[01]: 16 channel define
-	//[10]: 8 channel define
-	//[11]: same as code [00]
-#define PLL_O 0x03 // 0x3
-	// [00]~[11]=Div is 8/4/2/1(PLL)
-	//[00]: 8
-	//[01]: 4
-	//[10]: 2
-	//[11]: 1
-#define PLL_N 6 // 5 // 0x6
-	// b~7(5bits) // [00000]~[11111]: 0~31
-#define PLL_M 48 // 75 // 0x30
-	// 6~0(7bits) // [0000000]~[1111111]: 0~127
-	//Design options (analog_sel[2:0], PLL)
-	//PLL M >= 64,analog selection = [001]
-	//PLL M < 64,analog selection = [000]
-	else if(addr_ == 0X0005) { return
-((Channel_parallel_defined)<<0xE | (PLL_O)<<0xC | (PLL_N)<<0x7 | (PLL_M)<<0x0); } // 0x3330
-#define SW_Discharge_enable 1
-	//[0]: Disable
-	//[1]: Enable
-#define SW_Discharge_voltage_level 0x0
-	//[000]~[111]:
-	//[000]=> VLED-VSW=4.64V
-	//[100]=> VLED-VSW=2.77V
-	//[111]=> VLED-VSW=1.17V
-#define SW_Discharge_time 0
-	//[0]: 1us
-	//[1]: 2us
-#define GCLK_Frequency_Divider (4)
-	//[000000]: 1
-	//[000001]: 2
-	//[000010]: 3
-	//[000011]: 4
-	//...
-	//[111101]: 62
-	//[111110]: 63
-	//[111111]: 64
-	else if(addr_ == 0X0006) { return 
-((SW_Discharge_enable)<<0xf | (SW_Discharge_voltage_level)<<0xc | (SW_Discharge_time)<<0xb | (GCLK_Frequency_Divider)<<0x0); }	// 0x8005
-//-----------------------------------------------------------------------------------------------------------------------------
-#define Precharge_voltage 0 // (0xf)
-	//[0000]: 1.95V [1000]: 3.15V
-	//[0001]: 2.1V  [1001]: 3.3V
-	//[0010]: 2.25V [1010]: 3.45V
-	//[0011]: 2.4V  [1011]: 3.6V
-	//[0100]: 2.55V [1100]: 3.75V
-	//[0101]: 2.7V  [1101]: 3.9V
-	//[0110]: 2.85V [1110]: 4.05V
-	//[0111]: 3V  [1111]: 4.2V
-#define Precharge_location (0)
-	//[0]: pre-charge in deadtime
-	//[1]: pre-charge during channel off
-#define Precharge_global_enable (0)
-	//[0]: Disable
-	//[1]: Enable
-#define Current_gain (0x7)
-	//current gain value, [000]~[111]
-	//Delta-ratio rang :100%~200% step by 14.29%
-	else if(addr_ == 0X0007) { return 
-((Precharge_voltage)<<0xc | (Precharge_location)<<0xb | (Precharge_global_enable)<<0xa | (Current_gain)<<0x0); }	// 0x0000
-//-----------------------------------------------------------------------------------------------------------------------------
-#define Thermal_test_voltage 0
-	//[0]: 0.5V about 120CTSD=0
-	//[1]: 0.425V about 168CTSD=1 (thermal shut down)
-#define Analog_selection 0x0 // 0x01 // 0x0
-	// Design options (analog_sel[2:0], PLL)
-#define Decrease_overshoot 0
-	//[0]: Internal VD=0.1V (Def)
-	//[1]: Internal VD=0.3V
-#define Feedback_function_enable 0
-	//[0]: Disable
-	//[1]: Enable
-#define Open_error_detection_voltage 0
-	//*Open Error detection voltage threshold,
-	//[00] ~ [11]: High ~ Low
-#define Short_error_detection_voltage 0
-	//*Short Error detection voltage threshold,
-	//[00] ~ [11]: Low ~ High
-#define Tr_2_0 0
-	//Speed Control Tr, [000] ~ [111]: Low ~ High
-	//[000]:50nS	[100]:155nS
-	//[001]:75nS	[101]:195nS
-	//[010]:105nS	[110]:240nS
-	//[011]:130nS	[111]: 300nS
-#define Tf_2_0 0
-	//Speed Control Tf, [000] ~ [111]: Low ~ High
-	//[000]:55nS	[100]:155nS
-	//[001]:85nS	[101]:205nS
-	//[010]:105nS	[110]:285nS
-	//[011]:125nS	[111]: 400nS
-	else if(addr_ == 0X0008) { return 
-(Thermal_test_voltage<<0xf | Analog_selection<<0xc | Decrease_overshoot<<0xb | Feedback_function_enable<<0xa | Open_error_detection_voltage<<0x8 | Short_error_detection_voltage<<0x6 | Tr_2_0<<0x3 | Tf_2_0<<0x0); }		// 0x0000
-//-----------------------------------------------------------------------------------------------------------------------------
-#define MOS_switch_parallel_defined (0x01)
-	//MOS switch parallel defined
-	//[00]: 16 switch define
-	//[01]: 8 switch define
-	//[10]: 4 switch define
-	//[11]: 2 switch define
-#define Global_brightness_control (0x3fff)
-	// Global Brightness control (14-bit)
-	else if(addr_ == 0X0009) { return 
-(MOS_switch_parallel_defined<<0xe | Global_brightness_control<<0x0) ; }		// 0x7FFF
-//-----------------------------------------------------------------------------------------------------------------------------
-	else if(addr_ == 0X000a) { return 0x0000; }		// 0x0000
-	else if(addr_ == 0X000b) { return 0x0008; }		// 0x0008
-	else if(addr_ == 0X000c) { return 0x00FF; }		// 0x00FF
-	else if(addr_ == 0X000d) { return 0x0000; }		// 0x0000
-			//0x3fff
-	else if(addr_ >= 0x0010 && addr_ <= 0x010f) { return 0xfff; }	// SCAN0~SCAN7 Brightness code of Channel31~Channel0
-	else if(addr_ >= 0x0110 && addr_ <= 0x020f) { return 0; }	// SCAN8~SCAN15 Brightness code of Channel31~Channel0
-			// 0xffff
-	else if(addr_ >= 0x0210 && addr_ <= 0x023f) { return 0; }	// SCAN0~SCAN7 dot correction
-	else if(addr_ >= 0x0240 && addr_ <= 0x026f) { return 0; }		// SCAN8~SCAN15 dot correction
-	else if(addr_ == 0x0009) { return 0x3fff; }
-	return value_;
-}
 int get_PWM_data_bit_max_value() {
 #if PWM_data_bit == 0x00
 	return 16384;
@@ -1144,9 +941,6 @@ public:
 MbiDevice::MbiDevice() {
 	backlight_data_fill(100);
 
-	initControl_gpio_pins();
-	initSpi_gpio_pins();
-
 #if WITH_HW_SPI
 	mSpiDevice0 = new SpiDevice(spi_device_0_0);
 	mSpiDevice1 = new SpiDevice(spi_device_0_1);
@@ -1201,7 +995,7 @@ void MbiDevice::init() {
 
 	DELAY_Millis(10);
 
-	fprintf(stderr, "mbi6322_initial_settings_reg_size:%d (*2=%d) / real:%d \r\n", mbi6322_initial_settings_reg_size,
+	DLOGD( "mbi6322_initial_settings_reg_size:%d (*2=%d) / real:%d \r\n", mbi6322_initial_settings_reg_size,
 		mbi6322_initial_settings_reg_size*2
 		, (int)(sizeof(mbi6322_initial_settings)/sizeof(mbi6322_initial_settings[0])));
 
@@ -1223,11 +1017,11 @@ void MbiDevice::init() {
 
 		//uint16_t value_ = 0;
 		//mSpiDevice0->readRegister(addr_, &value_);
-		//fprintf(stderr, "[%04X] : %04X \r\n", addr_, value_);
+		//DLOGD( "[%04X] : %04X \r\n", addr_, value_);
 	}
 
 	//mSpiDevice0->writeRegister(0x0f, 0x01);
-	fprintf(stderr, "spi0 initial settings done! \r\n");
+	DLOGD( "spi0 initial settings done! \r\n");
 #endif
 
 #if 1
@@ -1248,10 +1042,10 @@ void MbiDevice::init() {
 
 		//uint16_t value_ = 0;
 		//mSpiDevice1->readRegister(addr_, &value_);
-		//fprintf(stderr, "[%04X] : %04X \r\n", addr_, value_);
+		//DLOGD( "[%04X] : %04X \r\n", addr_, value_);
 	}
 	//mSpiDevice1->writeRegister(0x0f, 0x01);
-	fprintf(stderr, "spi1 initial settings done! \r\n");
+	DLOGD( "spi1 initial settings done! \r\n");
 #endif
 
 	backlight_data_fill(get_PWM_data_bit_max_value() - 1);
@@ -1264,14 +1058,14 @@ void MbiDevice::init() {
 	int reg_num = 0x0f;
 	int ret_len = 0;
 	int ret = 0;
-	fprintf(stderr, "----------------------------------------------------- \r\n");
+	DLOGD( "----------------------------------------------------- \r\n");
 	ret = mSpiDevice0->readRegisterBatch(reg_addr, reg_num, mDataBuffer, &ret_len);
-	fprintf(stderr, "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
+	DLOGD( "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
 	if (ret_len > 0) {
 		cycling::print2log_bytes(mDataBuffer, ret_len, "				", 16);
 	}
 	ret = mSpiDevice1->readRegisterBatch(reg_addr, reg_num, mDataBuffer, &ret_len);
-	fprintf(stderr, "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
+	DLOGD( "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
 	if (ret_len > 0) {
 		cycling::print2log_bytes(mDataBuffer, ret_len, "				", 16);
 	}
@@ -1295,7 +1089,7 @@ int MbiDevice::backlightSetData(int x, int y, int data_) {
 	return 0;
 }
 int MbiDevice::backlightCommit(int mapType) {
-	fprintf(stderr, "%s mapType = %d ... \r\n", __func__, mapType);
+	DLOGD( "%s mapType = %d ... \r\n", __func__, mapType);
 
 	int max_ = 0;
 	// 0, A1~A8		-> SCAN0~SCAN7
@@ -1326,7 +1120,7 @@ int MbiDevice::backlightCommit(int mapType) {
 			}
 		}
 	}
-	fprintf(stderr, "    max_ = %d \r\n", max_);
+	DLOGD( "    max_ = %d \r\n", max_);
 
 	mSpiDevice0->writeRegisterBatch(0x10, mbiData0, CHANNEL_NUM*8);
 	mSpiDevice1->writeRegisterBatch(0x30, mbiData1, CHANNEL_NUM*7);
@@ -1334,11 +1128,11 @@ int MbiDevice::backlightCommit(int mapType) {
 	mSpiDevice0->writeRegister(0x0f, 0x01);
 	mSpiDevice1->writeRegister(0x0f, 0x01);
 
-	fprintf(stderr, "%s done! \r\n", __func__);
+	DLOGD( "%s done! \r\n", __func__);
 	return 0;
 }
 void MbiDevice::backlight_data_fill(int data_) {
-	fprintf(stderr, "%s, data_ = %5d \r\n", __func__, data_);
+	DLOGD( "%s, data_ = %5d \r\n", __func__, data_);
 	for(int y=0;y<BL_HEIGHT;y++) {
 		for(int x=0;x<BL_WIDTH;x++) {
 			backlight_data_[y*BL_WIDTH + x] = data_;
@@ -1356,13 +1150,13 @@ TestCmdMiniLed::TestCmdMiniLed(uint32_t flags) :
 	mInitFlags(flags)
 	, mCmdline(::android::cmdline::factory::makeCmdline())
 {
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	mMbiDevice = new MbiDevice();
 	mValid = 1;
 }
 TestCmdMiniLed::~TestCmdMiniLed() {
 	delete mMbiDevice;
-	fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	DLOGD( "%s,%d \r\n", __func__, __LINE__);
 }
 void TestCmdMiniLed::initCmd() {
 	mCmdline->setPrompt("miniLed>>");
@@ -1374,10 +1168,13 @@ void TestCmdMiniLed::initCmd() {
 	CL_ADD_FUNC(mCmdline, w);
 	CL_ADD_FUNC(mCmdline, r);
 	CL_ADD_FUNC(mCmdline, bl);
+	CL_ADD_FUNC(mCmdline, vsync);
+
 	CL_ADD_FUNC(mCmdline, test1);
 	CL_ADD_FUNC(mCmdline, test2);
 	CL_ADD_FUNC(mCmdline, test3);
 	CL_ADD_FUNC(mCmdline, test4);
+	
 }
 int TestCmdMiniLed::runCommand(const char * cmd) {
 	return mCmdline->runCommand(cmd);
@@ -1395,7 +1192,7 @@ int TestCmdMiniLed::backlightCommit(int mapType) { return mMbiDevice->backlightC
 
 CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, date);
 int TestCmdMiniLed::date(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv);
-	fprintf(stderr, "build at %s %s \r\n", __DATE__, __TIME__);
+	DLOGD( "build at %s %s \r\n", __DATE__, __TIME__);
 	return 0;
 }
 
@@ -1419,48 +1216,48 @@ CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, w);
 int TestCmdMiniLed::w(int argc, char *const*argv) {
 	UNUSED_(argc); UNUSED_(argv);
 	if (argc <= 3) {
-		fprintf(stderr, "should input: w [reg_addr(hex)] [reg_num(dec)] hex#1 ... hex#reg_num \r\n");
+		DLOGD( "should input: w [reg_addr(hex)] [reg_num(dec)] hex#1 ... hex#reg_num \r\n");
 		return 0;
 	}
 	int reg_addr = _parse_hex_str(argv[1], cycling::FLAG_U16);
 	if (reg_addr < 0) {
-		fprintf(stderr, "reg_addr invalid! \r\n");
+		DLOGD( "reg_addr invalid! \r\n");
 		return 0;
 	}
 	int reg_num = 0;
 	if (cycling::_c__atoi(argv[2], &reg_num) < 0) {
-		fprintf(stderr, "reg_num invalid! \r\n");
+		DLOGD( "reg_num invalid! \r\n");
 		return 0;
 	}
 	if (reg_num <= 0 || reg_num != (argc - 3)) {
-		fprintf(stderr, "reg_num invalid! \r\n");
+		DLOGD( "reg_num invalid! \r\n");
 		return 0;
 	}
 
 	if(cycling::getData16_(argc -3, argv + 3, mDataBuffer, DATA_BUFFER_SIZE, &mDataNum) != 0) {
-		fprintf(stderr, "data invalid! \r\n");
+		DLOGD( "data invalid! \r\n");
 		return 0;
 	}
 	if ((int)mDataNum != reg_num) {
-		fprintf(stderr, "data num invalid! \r\n");
+		DLOGD( "data num invalid! \r\n");
 		return 0;
 	}
 
-	fprintf(stderr, "reg:0x%04x num:%04d \r\n", reg_addr, reg_num);
+	DLOGD( "reg:0x%04x num:%04d \r\n", reg_addr, reg_num);
 
 	// send to
 	int ret;
 	ret = mMbiDevice->mSpiDevice0->writeRegisterBatch(reg_addr, mDataBuffer, reg_num);
 	if (ret != 0) {
-		fprintf(stderr, "spi0 writePanelReg error! \r\n");
+		DLOGD( "spi0 writePanelReg error! \r\n");
 	} else {
-		fprintf(stderr, "spi0 writePanelReg ok! \r\n");
+		DLOGD( "spi0 writePanelReg ok! \r\n");
 	}
 	ret = mMbiDevice->mSpiDevice1->writeRegisterBatch(reg_addr, mDataBuffer, reg_num);
 	if (ret != 0) {
-		fprintf(stderr, "spi1 writePanelReg error! \r\n");
+		DLOGD( "spi1 writePanelReg error! \r\n");
 	} else {
-		fprintf(stderr, "spi1 writePanelReg ok! \r\n");
+		DLOGD( "spi1 writePanelReg ok! \r\n");
 	}
 
 	return 0;
@@ -1473,35 +1270,35 @@ CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, r);
 int TestCmdMiniLed::r(int argc, char *const*argv) {
 	UNUSED_(argc); UNUSED_(argv);
 	if (argc != 3) {
-		fprintf(stderr, "should input: r [reg_addr(hex)] [reg_num(dec)] \r\n");
+		DLOGD( "should input: r [reg_addr(hex)] [reg_num(dec)] \r\n");
 		return 0;
 	}
 	int reg_addr = _parse_hex_str(argv[1], cycling::FLAG_U16);
 	if (reg_addr < 0) {
-		fprintf(stderr, "reg_addr invalid! \r\n");
+		DLOGD( "reg_addr invalid! \r\n");
 		return 0;
 	}
 	int reg_num = 0;
 	if (cycling::_c__atoi(argv[2], &reg_num) < 0) {
-		fprintf(stderr, "reg_num invalid! \r\n");
+		DLOGD( "reg_num invalid! \r\n");
 		return 0;
 	}
 	if (reg_num <= 0 || reg_num > DATA_BUFFER_SIZE) {
-		fprintf(stderr, "reg_num invalid! \r\n");
+		DLOGD( "reg_num invalid! \r\n");
 		return 0;
 	}
 
 	int ret_len = 0;
 	int ret = 0;
 	
-	fprintf(stderr, "-----------------------------------------------------\r\n");
+	DLOGD( "-----------------------------------------------------\r\n");
 	ret = mMbiDevice->mSpiDevice0->readRegisterBatch(reg_addr, reg_num, mDataBuffer, &ret_len);
-	fprintf(stderr, "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
+	DLOGD( "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
 	if (ret_len > 0) {
 		cycling::print2log_bytes(mDataBuffer, ret_len, "                ", 16);
 	}
 	ret = mMbiDevice->mSpiDevice1->readRegisterBatch(reg_addr, reg_num, mDataBuffer, &ret_len);
-	fprintf(stderr, "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
+	DLOGD( "readRegister:0x%04x len:%04d ret: %d read_length:%d \r\n", reg_addr, reg_num, ret, ret_len);
 	if (ret_len > 0) {
 		cycling::print2log_bytes(mDataBuffer, ret_len, "                ", 16);
 	}
@@ -1511,16 +1308,16 @@ int TestCmdMiniLed::r(int argc, char *const*argv) {
 CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, bl);
 int TestCmdMiniLed::bl(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv);
 	if (argc != 2) {
-		fprintf(stderr, "input invalid! \r\n");
+		DLOGD( "input invalid! \r\n");
 		return 0;
 	}
 	int color_ = 0;
 	if (cycling::_c__atoi(argv[1], &color_) < 0) {
-		fprintf(stderr, "color_ invalid! \r\n");
+		DLOGD( "color_ invalid! \r\n");
 		return 0;
 	}
 	if (color_ < 0 || color_ > 65535) {
-		fprintf(stderr, "color_ invalid! \r\n");
+		DLOGD( "color_ invalid! \r\n");
 		return 0;
 	}
 
@@ -1528,12 +1325,52 @@ int TestCmdMiniLed::bl(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv
 	mMbiDevice->backlightCommit(1);
 	return 0;
 }
+CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, vsync);
+int TestCmdMiniLed::vsync(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv);
+	int num_ = 1;
+	long wait_time = 33;
+	if (argc == 2) {
+		if (cycling::_c__atoi(argv[1], &num_) < 0) {
+			DLOGD( "num_ parse invalid! \r\n");
+			return 0;
+		}
+		if (num_ <= 0 || num_ >= 60000) {
+			DLOGD( "num_ invalid! \r\n");
+			return 0;
+		}
+	} else if(argc == 3) {
+			if (cycling::_c__atoi(argv[1], &num_) < 0) {
+				DLOGD( "num_ parse invalid! \r\n");
+				return 0;
+			}
+			if (num_ <= 0 || num_ >= 60000) {
+				DLOGD( "num_ invalid! \r\n");
+				return 0;
+			}
+			
+			if (cycling::_c__atol(argv[1], &wait_time) < 0) {
+				DLOGD( "wait_time parse invalid! \r\n");
+				return 0;
+			}
+			if (wait_time <= 0 || wait_time >= 10000) {
+				DLOGD( "wait_time invalid! \r\n");
+				return 0;
+			}
+	} else if (argc > 3) { DLOGD( "invalid input! \r\n"); return 0; }
+
+	for(int i=0;i<num_;i++) {
+		mMbiDevice->mSpiDevice0->writeRegister(0x0f, 0x01);
+		mMbiDevice->mSpiDevice1->writeRegister(0x0f, 0x01);
+		usleep(wait_time*1000);
+	}
+	return 0;
+}
 
 CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, test1);
 int TestCmdMiniLed::test1(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv);
 	int pin_num = 0;
 	if (cycling::_c__atoi(argv[1], &pin_num) < 0) {
-		fprintf(stderr, "pin_num parse invalid! \r\n");
+		DLOGD( "pin_num parse invalid! \r\n");
 		return 0;
 	}
 	if (pin_num == 5
@@ -1547,20 +1384,20 @@ int TestCmdMiniLed::test1(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(a
 		|| pin_num == 66
 		) {
 	} else {
-		fprintf(stderr, "pin_num invalid! \r\n");
+		DLOGD( "pin_num invalid! \r\n");
 		return 0;
 	}
 
 	int pin_state = 0;
 	if (cycling::_c__atoi(argv[2], &pin_state) < 0) {
-		fprintf(stderr, "pin_state parse invalid! \r\n");
+		DLOGD( "pin_state parse invalid! \r\n");
 		return 0;
 	}
 	if (pin_state != 0 && pin_state != 1) {
-		fprintf(stderr, "pin_state invalid! \r\n");
+		DLOGD( "pin_state invalid! \r\n");
 		return 0;
 	}
-	fprintf(stderr, "pin_num:%d state:%d \r\n", pin_num, pin_state);
+	DLOGD( "pin_num:%d state:%d \r\n", pin_num, pin_state);
 	PIN_OUT_VALUE(GPIOSYS_PINCTRL_BASE+pin_num, pin_state);
 
 	return 0;
@@ -1568,7 +1405,7 @@ int TestCmdMiniLed::test1(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(a
 CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, test2);
 int TestCmdMiniLed::test2(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv);
 	if (argc != 2) {
-		fprintf(stderr, "should input: test2 [test_num(dec)] \r\n");
+		DLOGD( "should input: test2 [test_num(dec)] \r\n");
 		return 0;
 	}
 	return 0;
@@ -1576,7 +1413,7 @@ int TestCmdMiniLed::test2(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(a
 CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, test3);
 int TestCmdMiniLed::test3(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv);
 	if (argc != 2) {
-		fprintf(stderr, "should input: test3 [test_num(dec)] \r\n");
+		DLOGD( "should input: test3 [test_num(dec)] \r\n");
 		return 0;
 	}
 
@@ -1586,17 +1423,17 @@ int TestCmdMiniLed::test3(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(a
 CL_SFUNC_IMPL(TestCmdMiniLed, TestCmdMiniLed, test4);
 int TestCmdMiniLed::test4(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(argv);
 	if (argc != 2) {
-		fprintf(stderr, "should input: test4 [test_num(dec)] \r\n");
+		DLOGD( "should input: test4 [test_num(dec)] \r\n");
 		return 0;
 	}
 
 	int num_ = 0;
 	if (cycling::_c__atoi(argv[1], &num_) < 0) {
-		fprintf(stderr, "num_ parse invalid! \r\n");
+		DLOGD( "num_ parse invalid! \r\n");
 		return 0;
 	}
 	if (num_ <= 0 || num_ >= 60000) {
-		fprintf(stderr, "num_ invalid! \r\n");
+		DLOGD( "num_ invalid! \r\n");
 		return 0;
 	}
 	
@@ -1608,6 +1445,68 @@ int TestCmdMiniLed::test4(int argc, char *const*argv) { UNUSED_(argc); UNUSED_(a
 }
 
 
+/*static*/ int TestCmdMiniLed::_main(int argc, char **argv) {
+	UNUSED_(argc);
+	UNUSED_(argv);
+	//FrLOGV( "%s,%d", __func__, __LINE__);
+
+    static const struct option longOptions[] = {
+        { "help",               no_argument,        NULL, 'h' },
+        { "verbose",            no_argument,        NULL, 'v' },
+        { "capi",               no_argument,  NULL, 'c' },
+        { "qdcm",               no_argument,  NULL, 'q' },
+        { "dummy",               required_argument,  NULL, 'd' },
+        { NULL,                 0,                  NULL, 0 }
+    };
+
+	int capi = 0;
+	int qdcm_enable = 0;
+    while (true) {
+        int optionIndex = 0;
+        int ic = getopt_long(argc, argv, "", longOptions, &optionIndex);
+        if (ic == -1) {
+            break;
+        }
+		switch (ic) {
+		case 'h': {
+			break;
+		}
+		case 'v': {
+			break;
+		}
+		case 'c': {
+			capi = 1;
+			break;
+		}
+		case 'q': {
+			qdcm_enable = 1;
+			break;
+		}
+		}
+    }
+
+	{
+		uint32_t initFlags = 0;
+		if (qdcm_enable) {
+			initFlags |= 0x8000;
+		}
+		if (capi) {
+			initFlags |= 0x4000;
+		}
+		TestCmdMiniLed* _test =
+			new TestCmdMiniLed(initFlags);
+		if (_test->isValid()) {
+			_test->loop();
+		}
+		else {
+			//FrLOGV( "%s,%d not valid!", __func__, __LINE__);
+		}
+		delete _test;
+	}
+
+
+	return 0;
+}
 
 
 };

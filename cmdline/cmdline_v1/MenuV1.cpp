@@ -2,9 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "utils/football_debugger.h"
+
+#include "CmdLine.h"
+
 #include "linktable.h"
 
 #include "MenuV1.h"
+
+#undef __CLASS__
+#define __CLASS__ "MenuV1"
 
 #if 0
 
@@ -64,7 +71,7 @@ static tDataNode* FindCmd(tLinkTable * head, char * cmd) {
 static int ShowAllCmd(tLinkTable * head) {
     tDataNode * pNode = (tDataNode*)GetLinkTableHead(head);
     while(pNode != NULL) {
-        printf("    * %s - %s\n", pNode->cmd, pNode->desc);
+        fprintf(stderr, "    * %s - %s\n", pNode->cmd, pNode->desc);
         pNode = (tDataNode*)GetNextLinkTableNode(head,(tLinkTableNode *)pNode);
     }
     return 0;
@@ -115,14 +122,14 @@ int MenuV1::menuConfig(const char * cmd, const char * desc, PF_handler handler, 
 		mHead = head;
 	
 		pNode = (tDataNode*)malloc(sizeof(tDataNode));
-		pNode->cmd = "help";
+		pNode->cmd = android::Cmdline::kCmd_help;
 		pNode->desc = "Menu List";
 		pNode->handler = Help;
 		pNode->ctx = this;
 		AddLinkTableNode(head,(tLinkTableNode *)pNode);
 
 		pNode = (tDataNode*)malloc(sizeof(tDataNode));
-		pNode->cmd = "h";
+		pNode->cmd = android::Cmdline::kCmd_h_;
 		pNode->desc = "Menu List";
 		pNode->handler = Help;
 		pNode->ctx = this;
@@ -147,7 +154,7 @@ int MenuV1::loop() {
 		char *argv[MENUV1_CMD_MAX_ARGV_NUM];
         char cmd[MENUV1_CMD_MAX_LEN + 16];
 		char *pcmd = NULL;
-        printf("%s", mPrompt);
+        DLOGD("%s", mPrompt);
 
 		// get one line from cmline
 		
@@ -160,7 +167,7 @@ int MenuV1::loop() {
 			continue;
 		}
 	#if 1
-		//fprintf(stderr, "(%s)\r\n", pcmd);
+		//DLOGD( "(%s)\r\n", pcmd);
 		int pcmd_length = strlen(pcmd);
 		if (pcmd_length >= 1) {
 			if (pcmd[pcmd_length - 1] == '\n') {
@@ -186,7 +193,7 @@ int MenuV1::loop() {
 		if (strlen(pcmd) == 0) {
 			continue;
 		}
-		//fprintf(stderr, "(%s)\r\n", pcmd);
+		//DLOGD( "(%s)\r\n", pcmd);
 	#endif
 	
         /* convert cmd to argc/argv */
@@ -202,7 +209,7 @@ int MenuV1::loop() {
             *(argv[0] + len - 1) = '\0';
         }
 	#endif
-		//fprintf(stderr, "argc:%d argv[0]=(%s)\r\n", argc, argv[0]);
+		//DLOGD( "argc:%d argv[0]=(%s)\r\n", argc, argv[0]);
 	
 		if (argc == 0 || argv[0] == NULL || strlen(argv[0]) <= 0) {
 			continue;
@@ -221,16 +228,15 @@ int MenuV1::cmd_process(int argc, char * const argv[]) {
 	LinkTable *head = (LinkTable *)mHead;
 	tDataNode *p = (tDataNode*)SearchLinkTableNode(head,SearchConditon,(void*)argv[0]);
 	if( p == NULL) {
-		//fprintf(stderr, "%s,%d no command\r\n", __func__, __LINE__);
+		//DLOGD( "%s,%d no command\r\n", __func__, __LINE__);
 		return 0;
 	}
-	printf("%s - %s\n", p->cmd, p->desc);
+	DLOGD("%s - %s\n", p->cmd, p->desc);
 	if(p->handler != NULL) { 
-		if (p->handler(p->ctx, argc, argv) == -10000) {
-			return -10000;
-		}
+		int r = p->handler(p->ctx, argc, argv);
+		return r;
 	}
-	return 1;
+	return -1;
 }
 
 #endif

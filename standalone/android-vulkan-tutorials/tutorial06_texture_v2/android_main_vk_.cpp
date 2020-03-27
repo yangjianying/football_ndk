@@ -14,6 +14,8 @@
 #include <media/NdkImageReader.h>
 #include <unistd.h>
 
+#include "FootballConfig.h"
+
 #include "native_app_glue.h"
 
 #include "ImageReaderHolder.h"
@@ -23,11 +25,8 @@
 
 #define kTAG_ "android_main_vk"
 
-
-#define TEST_WIDTH (1080)
-#define TEST_HEIGHT (1920)
-
-
+#undef __CLASS__
+#define __CLASS__ "android_main_vk"
 
 #define IMAGE_INCOMMING (APP_CMD_USER_START_ + 1)
 
@@ -45,7 +44,9 @@ public:
 	android_app_ *mApp = nullptr;
 };
 static void init_image_reader(android_app_* app) {
-	ImageReaderHolder *holder = new ImageReaderHolder_vk(app, TEST_WIDTH, TEST_HEIGHT, AIMAGE_FORMAT_RGBA_8888, 
+	int width_ = ANativeWindow_getWidth(app->window);
+	int height_ = ANativeWindow_getHeight(app->window);
+	ImageReaderHolder *holder = new ImageReaderHolder_vk(app, width_, height_, AIMAGE_FORMAT_RGBA_8888, 
 		AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN
 		| AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE);
 	app->userData = holder;
@@ -63,7 +64,7 @@ static void handle_cmd(android_app_* app, int32_t cmd) {
     __android_log_print(ANDROID_LOG_INFO, kTAG_,
                         "handle_cmd: %d/%s", cmd, get_app_cmd_desc(cmd));
 	
-	fprintf(stderr, "%s %d/%s \r\n", __func__, cmd, get_app_cmd_desc(cmd));
+	DLOGD( "%s %d/%s \r\n", __func__, cmd, get_app_cmd_desc(cmd));
     switch (cmd) {
         case APP_CMD_INIT_WINDOW_:
             // The window is being shown, get it ready.
@@ -106,13 +107,13 @@ static void handle_cmd(android_app_* app, int32_t cmd) {
             //                    "event not handled: %d/%s", cmd, get_app_cmd_desc(cmd));
             break;
     }
-	fprintf(stderr, "%s %d done! \r\n", __func__, cmd);
+	DLOGD( "%s %d done! \r\n", __func__, cmd);
 }
 
 void android_main_vk(struct android_app_* app) {
-	fprintf(stderr, ">> %s << \r\n", __func__);
+	DLOGD( ">> %s << \r\n", __func__);
 
-	::android_facade::AAssetManagerImpl_setAssetRootPath("/sdcard/data/tutorial06_texture/assets/");
+	::android_facade::AAssetManagerImpl_setAssetRootPath("tutorial06_texture/assets/");
 
     // Set the callback to process system events
     app->onAppCmd = handle_cmd;
@@ -139,6 +140,6 @@ void android_main_vk(struct android_app_* app) {
 	#endif
     } while (app->destroyRequested == 0);
 
-    fprintf(stderr, "%s done.\r\n", __func__);
+    DLOGD( "%s done.\r\n", __func__);
 }
 

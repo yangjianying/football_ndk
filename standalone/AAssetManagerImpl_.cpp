@@ -10,6 +10,8 @@
 #include <assert.h>
 
 #include "FootballConfig.h"
+#undef __CLASS__
+#define __CLASS__ "AAssetManagerImpl_"
 
 typedef struct AAssetManager AAssetManager_android;
 typedef struct AAsset AAsset_android;
@@ -32,8 +34,7 @@ static off_t AAsset_getLength__(AAsset* asset) {
 
 #if 1  // frankie, add
 // Android log function wrappers
-//static const char* kTAG = "Vulkan-Tutorial06";
-static const char* kTAG = "native_app_assets";
+static const char* kTAG = "AAssetManagerImpl";
 
 #define LOGI(...) \
   ((void)__android_log_print(ANDROID_LOG_INFO, kTAG, __VA_ARGS__))
@@ -79,13 +80,24 @@ int AAsset_isAllocated(AAsset* asset);
 
  * */
 
-static std::string SDCARD_PATH__ = AAssetManagerImpl_DEFAULT_PATH;
-static std::string android_facade_AssetRootPath = SDCARD_PATH__;
+static std::string android_facade_AssetBasePath = AAssetManagerImpl_DEFAULT_BASEPATH;
+
+static std::string android_facade_AssetRootPath = AAssetManagerImpl_DEFAULT_PATH;
 namespace android_facade {
-	std::string AAssetManagerImpl_setAssetRootPath(std::string path_) {
+	std::string AAssetManagerImpl_setAssetBasePath(std::string base_path_) {
+		std::string r = android_facade_AssetBasePath;
+		android_facade_AssetBasePath = base_path_;
+		DLOGD( "AssetBasePath:%s \r\n", android_facade_AssetBasePath.c_str());
+		return r;
+	}
+	std::string AAssetManagerImpl_setAssetRootPath(std::string path_, bool with_base_path) {
 		std::string r = android_facade_AssetRootPath;
-		android_facade_AssetRootPath = path_;
-		fprintf(stderr, "AssetRootPath:%s \r\n", android_facade_AssetRootPath.c_str());
+		if (with_base_path == false) {
+			android_facade_AssetRootPath = path_;
+		} else {
+			android_facade_AssetRootPath = android_facade_AssetBasePath + path_;
+		}
+		DLOGD( "AssetRootPath:%s \r\n", android_facade_AssetRootPath.c_str());
 		return r;
 	}
 };
@@ -105,18 +117,24 @@ struct AAsset_ {
 //AAsset* __IMPL(AAssetManager_open)(AAssetManager* mgr, const char* filename, int mode)
 AAsset* __IMPL(AAssetManager_open)(const char *caller_file, int caller_line, AAssetManager* mgr, const char* filename, int mode) 
 {
-	fprintf(stderr, "%s from:%s/%d \r\n", __func__, caller_file, caller_line);
+	DLOGD( "%s from:%s/%d \r\n", __func__, caller_file, caller_line);
+	LOGW("%s from:%s/%d \r\n", __func__, caller_file, caller_line);
+
+	DLOGD( "%s, filename:%s ", __func__, filename);
     LOGW("%s, filename:%s ", __func__, filename);
+
     AAsset_ *aAsset_ = new AAsset_();
     aAsset_->filename = android_facade_AssetRootPath + filename;
     aAsset_->fp = fopen(aAsset_->filename.c_str(), "rb");
     //assert(aAsset_->fp != NULL);
     if (aAsset_->fp == nullptr) {
 		delete aAsset_;
-		fprintf(stderr, "aAsset_->filename:%s not found!\r\n", aAsset_->filename.c_str());
+		DLOGD( "aAsset_->filename:%s not found!\r\n", aAsset_->filename.c_str());
+		LOGW("aAsset_->filename:%s not found!\r\n", aAsset_->filename.c_str());
 		return nullptr;
 	}
-	fprintf(stderr, "aAsset_->filename:%s fopen ok!\r\n", aAsset_->filename.c_str());
+	DLOGD( "aAsset_->filename:%s fopen ok!\r\n", aAsset_->filename.c_str());
+	LOGW("aAsset_->filename:%s fopen ok!\r\n", aAsset_->filename.c_str());
     fseek(aAsset_->fp, 0, SEEK_SET);
     return aAsset_;
 }

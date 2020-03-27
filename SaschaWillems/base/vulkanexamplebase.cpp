@@ -8,8 +8,201 @@
 
 #include "vulkanexamplebase.h"
 
+#undef __CLASS__
+#define __CLASS__ "VulkanExampleBase"
+
 std::vector<const char*> VulkanExampleBase::args;
 
+VulkanExampleBase::VulkanExampleBase(bool enableValidation)
+{
+	DLOGD( "%s ...\r\n", __func__);
+
+#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
+	// Check for a valid asset path
+	struct stat info;
+	if (stat(getAssetPath().c_str(), &info) != 0)
+	{
+#if defined(_WIN32)
+		std::string msg = "Could not locate asset path in \"" + getAssetPath() + "\" !";
+		MessageBox(NULL, msg.c_str(), "Fatal error", MB_OK | MB_ICONERROR);
+#else
+		std::cerr << "Error: Could not find asset path in " << getAssetPath() << std::endl;
+#endif
+		exit(-1);
+	}
+#endif
+
+	settings.validation = enableValidation;
+
+	char* numConvPtr;
+
+	// Parse command line arguments
+	for (size_t i = 0; i < args.size(); i++)
+	{
+		if (args[i] == std::string("-validation")) {
+			settings.validation = true;
+		}
+		if (args[i] == std::string("-vsync")) {
+			settings.vsync = true;
+		}
+		if ((args[i] == std::string("-f")) || (args[i] == std::string("--fullscreen"))) {
+			settings.fullscreen = true;
+		}
+		if ((args[i] == std::string("-w")) || (args[i] == std::string("-width"))) {
+			uint32_t w = strtol(args[i + 1], &numConvPtr, 10);
+			if (numConvPtr != args[i + 1]) { width = w; };
+		}
+		if ((args[i] == std::string("-h")) || (args[i] == std::string("-height"))) {
+			uint32_t h = strtol(args[i + 1], &numConvPtr, 10);
+			if (numConvPtr != args[i + 1]) { height = h; };
+		}
+		// Benchmark
+		if ((args[i] == std::string("-b")) || (args[i] == std::string("--benchmark"))) {
+			benchmark.active = true;
+			vks::tools::errorModeSilent = true;
+		}
+		// Warmup time (in seconds)
+		if ((args[i] == std::string("-bw")) || (args[i] == std::string("--benchwarmup"))) {
+			if (args.size() > i + 1) {
+				uint32_t num = strtol(args[i + 1], &numConvPtr, 10);
+				if (numConvPtr != args[i + 1]) {
+					benchmark.warmup = num;
+				} else {
+					std::cerr << "Warmup time for benchmark mode must be specified as a number!" << std::endl;
+				}
+			}
+		}
+		// Benchmark runtime (in seconds)
+		if ((args[i] == std::string("-br")) || (args[i] == std::string("--benchruntime"))) {
+			if (args.size() > i + 1) {
+				uint32_t num = strtol(args[i + 1], &numConvPtr, 10);
+				if (numConvPtr != args[i + 1]) {
+					benchmark.duration = num;
+				}
+				else {
+					std::cerr << "Benchmark run duration must be specified as a number!" << std::endl;
+				}
+			}
+		}
+		// Bench result save filename (overrides default)
+		if ((args[i] == std::string("-bf")) || (args[i] == std::string("--benchfilename"))) {
+			if (args.size() > i + 1) {
+				if (args[i + 1][0] == '-') {
+					std::cerr << "Filename for benchmark results must not start with a hyphen!" << std::endl;
+				} else {
+					benchmark.filename = args[i + 1];
+				}
+			}
+		}
+		// Output frame times to benchmark result file
+		if ((args[i] == std::string("-bt")) || (args[i] == std::string("--benchframetimes"))) {
+			benchmark.outputFrameTimes = true;
+		}
+	}
+	
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+	// Vulkan library is loaded dynamically on Android
+	bool libLoaded = vks::android::loadVulkanLibrary();
+	assert(libLoaded);
+#elif defined(_DIRECT2DISPLAY)
+
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+	initWaylandConnection();
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+	initxcbConnection();
+#endif
+
+#if defined(_WIN32)
+	// Enable console if validation is active
+	// Debug message callback will output to it
+	if (this->settings.validation)
+	{
+		setupConsole("Vulkan validation output");
+	}
+	setupDPIAwareness();
+#endif
+
+	DLOGD( "%s done \r\n", __func__);
+}
+
+VulkanExampleBase::~VulkanExampleBase()
+{
+	DLOGD( "%s ... \r\n", __func__);
+
+	// Clean up Vulkan resources
+	swapChain.cleanup();
+	if (descriptorPool != VK_NULL_HANDLE)
+	{
+		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+	}
+	destroyCommandBuffers();
+	vkDestroyRenderPass(device, renderPass, nullptr);
+	for (uint32_t i = 0; i < frameBuffers.size(); i++)
+	{
+		vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
+	}
+
+	for (auto& shaderModule : shaderModules)
+	{
+		vkDestroyShaderModule(device, shaderModule, nullptr);
+	}
+	vkDestroyImageView(device, depthStencil.view, nullptr);
+	vkDestroyImage(device, depthStencil.image, nullptr);
+	vkFreeMemory(device, depthStencil.mem, nullptr);
+
+	vkDestroyPipelineCache(device, pipelineCache, nullptr);
+
+	vkDestroyCommandPool(device, cmdPool, nullptr);
+
+	if (semaphores.presentComplete != VK_NULL_HANDLE) {
+		vkDestroySemaphore(device, semaphores.presentComplete, nullptr);
+		semaphores.presentComplete = VK_NULL_HANDLE;
+	}
+	if (semaphores.renderComplete != VK_NULL_HANDLE) {
+		vkDestroySemaphore(device, semaphores.renderComplete, nullptr);
+		semaphores.renderComplete = VK_NULL_HANDLE;
+	}
+	for (auto& fence : waitFences) {
+		vkDestroyFence(device, fence, nullptr);
+	}
+
+	if (settings.overlay) {
+		UIOverlay.freeResources();
+	}
+
+	delete vulkanDevice;
+
+	if (settings.validation)
+	{
+		vks::debug::freeDebugCallback(instance);
+	}
+
+	vkDestroyInstance(instance, nullptr);
+
+#if defined(_DIRECT2DISPLAY)
+
+#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
+	xdg_toplevel_destroy(xdg_toplevel);
+	xdg_surface_destroy(xdg_surface);
+	wl_surface_destroy(surface);
+	if (keyboard)
+		wl_keyboard_destroy(keyboard);
+	if (pointer)
+		wl_pointer_destroy(pointer);
+	wl_seat_destroy(seat);
+	xdg_wm_base_destroy(shell);
+	wl_compositor_destroy(compositor);
+	wl_registry_destroy(registry);
+	wl_display_disconnect(display);
+#elif defined(VK_USE_PLATFORM_ANDROID_KHR)
+	// todo : android cleanup (if required)
+#elif defined(VK_USE_PLATFORM_XCB_KHR)
+	xcb_destroy_window(connection, window);
+	xcb_disconnect(connection);
+#endif
+
+	DLOGD( "%s done ! \r\n", __func__);
+}
 VkResult VulkanExampleBase::createInstance(bool enableValidation)
 {
 	this->settings.validation = enableValidation;
@@ -90,6 +283,182 @@ VkResult VulkanExampleBase::createInstance(bool enableValidation)
 	return vkCreateInstance(&instanceCreateInfo, nullptr, &instance);
 }
 
+bool VulkanExampleBase::initVulkan()
+{
+	DLOGD( "%s ... \r\n", __func__);
+	VkResult err;
+
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)  // frankie, add for import hardwarebuffer !
+	enabledDeviceExtensions.push_back(VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME);
+	enabledDeviceExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+	enabledDeviceExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+	enabledDeviceExtensions.push_back(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
+#endif
+
+	// Vulkan instance
+	err = createInstance(settings.validation);
+	if (err) {
+		vks::tools::exitFatal("Could not create Vulkan instance : \n" + vks::tools::errorString(err), err);
+		return false;
+	}
+
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+	vks::android::loadVulkanFunctions(instance);
+#endif
+
+	// If requested, we enable the default validation layers for debugging
+	if (settings.validation)
+	{
+		// The report flags determine what type of messages for the layers will be displayed
+		// For validating (debugging) an appplication the error and warning bits should suffice
+		VkDebugReportFlagsEXT debugReportFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+		// Additional flags include performance info, loader and layer debug messages, etc.
+		vks::debug::setupDebugging(instance, debugReportFlags, VK_NULL_HANDLE);
+	}
+
+	// Physical device
+	uint32_t gpuCount = 0;
+	// Get number of available physical devices
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr));
+	assert(gpuCount > 0);
+	// Enumerate devices
+	std::vector<VkPhysicalDevice> physicalDevices(gpuCount);
+	err = vkEnumeratePhysicalDevices(instance, &gpuCount, physicalDevices.data());
+	if (err) {
+		vks::tools::exitFatal("Could not enumerate physical devices : \n" + vks::tools::errorString(err), err);
+		return false;
+	}
+
+	// GPU selection
+
+	// Select physical device to be used for the Vulkan example
+	// Defaults to the first device unless specified by command line
+	uint32_t selectedDevice = 0;
+
+#if !defined(VK_USE_PLATFORM_ANDROID_KHR)	
+	// GPU selection via command line argument
+	for (size_t i = 0; i < args.size(); i++)
+	{
+		// Select GPU
+		if ((args[i] == std::string("-g")) || (args[i] == std::string("-gpu")))
+		{
+			char* endptr;
+			uint32_t index = strtol(args[i + 1], &endptr, 10);
+			if (endptr != args[i + 1]) 
+			{ 
+				if (index > gpuCount - 1)
+				{
+					std::cerr << "Selected device index " << index << " is out of range, reverting to device 0 (use -listgpus to show available Vulkan devices)" << std::endl;
+				} 
+				else
+				{
+					std::cout << "Selected Vulkan device " << index << std::endl;
+					selectedDevice = index;
+				}
+			};
+			break;
+		}
+		// List available GPUs
+		if (args[i] == std::string("-listgpus"))
+		{
+			uint32_t gpuCount = 0;
+			VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr));
+			if (gpuCount == 0) 
+			{
+				std::cerr << "No Vulkan devices found!" << std::endl;
+			}
+			else 
+			{
+				// Enumerate devices
+				std::cout << "Available Vulkan devices" << std::endl;
+				std::vector<VkPhysicalDevice> devices(gpuCount);
+				VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, devices.data()));
+				for (uint32_t i = 0; i < gpuCount; i++) {
+					VkPhysicalDeviceProperties deviceProperties;
+					vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
+					std::cout << "Device [" << i << "] : " << deviceProperties.deviceName << std::endl;
+					std::cout << " Type: " << vks::tools::physicalDeviceTypeString(deviceProperties.deviceType) << std::endl;
+					std::cout << " API: " << (deviceProperties.apiVersion >> 22) << "." << ((deviceProperties.apiVersion >> 12) & 0x3ff) << "." << (deviceProperties.apiVersion & 0xfff) << std::endl;
+				}
+			}
+		}
+	}
+#endif
+
+	physicalDevice = physicalDevices[selectedDevice];
+
+	// Store properties (including limits), features and memory properties of the phyiscal device (so that examples can check against them)
+	vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+	vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
+
+	// Derived examples can override this to set actual features (based on above readings) to enable for logical device creation
+	getEnabledFeatures();
+
+	//------------------------------------------------------------------------------------------------
+	//------------------------------------------------------------------------------------------------
+	//------------------------------------------------------------------------------------------------
+	//------------------------------------------------------------------------------------------------
+	// Vulkan device creation
+	// This is handled by a separate class that gets a logical device representation
+	// and encapsulates functions related to a device
+	vulkanDevice = new vks::VulkanDevice(physicalDevice);
+	VkResult res = vulkanDevice->createLogicalDevice(enabledFeatures, enabledDeviceExtensions, deviceCreatepNextChain);
+	if (res != VK_SUCCESS) {
+		vks::tools::exitFatal("Could not create Vulkan device: \n" + vks::tools::errorString(res), res);
+		return false;
+	}
+	device = vulkanDevice->logicalDevice;
+
+	// Get a graphics queue from the device
+	vkGetDeviceQueue(device, vulkanDevice->queueFamilyIndices.graphics, 0, &queue);
+
+	DLOGD( "* %s, queue: %p \r\n", __func__, queue);
+
+	// Find a suitable depth format
+	VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &depthFormat);
+	assert(validDepthFormat);
+
+	swapChain.connect(instance, physicalDevice, device);
+
+	// Create synchronization objects
+	VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
+	// Create a semaphore used to synchronize image presentation
+	// Ensures that the image is displayed before we start submitting new commands to the queu
+	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.presentComplete));
+	// Create a semaphore used to synchronize command submission
+	// Ensures that the image is not presented until all commands have been sumbitted and executed
+	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.renderComplete));
+
+	// Set up submit info structure
+	// Semaphores will stay the same during application lifetime
+	// Command buffer submission info is set by each example
+	submitInfo = vks::initializers::submitInfo();
+	submitInfo.pWaitDstStageMask = &submitPipelineStages;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = &semaphores.presentComplete;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &semaphores.renderComplete;
+
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+	// Get Android device name and manufacturer (to display along GPU name)
+	androidProduct = "";
+	char prop[PROP_VALUE_MAX+1];
+	int len = __system_property_get("ro.product.manufacturer", prop);
+	if (len > 0) {
+		androidProduct += std::string(prop) + " ";
+	};
+	len = __system_property_get("ro.product.model", prop);
+	if (len > 0) {
+		androidProduct += std::string(prop);
+	};
+	LOGD("androidProduct = %s", androidProduct.c_str());
+#endif	
+
+	DLOGD( "%s done \r\n", __func__);
+	return true;
+}
+
 std::string VulkanExampleBase::getWindowTitle()
 {
 	std::string device(deviceProperties.deviceName);
@@ -115,81 +484,6 @@ const std::string VulkanExampleBase::getAssetPath()
 }
 #endif
 
-bool VulkanExampleBase::checkCommandBuffers()
-{
-	for (auto& cmdBuffer : drawCmdBuffers)
-	{
-		if (cmdBuffer == VK_NULL_HANDLE)
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-void VulkanExampleBase::createCommandBuffers()
-{
-	// Create one command buffer for each swap chain image and reuse for rendering
-	drawCmdBuffers.resize(swapChain.imageCount);
-
-	VkCommandBufferAllocateInfo cmdBufAllocateInfo =
-		vks::initializers::commandBufferAllocateInfo(
-			cmdPool,
-			VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			static_cast<uint32_t>(drawCmdBuffers.size()));
-
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, drawCmdBuffers.data()));
-}
-
-void VulkanExampleBase::destroyCommandBuffers()
-{
-	vkFreeCommandBuffers(device, cmdPool, static_cast<uint32_t>(drawCmdBuffers.size()), drawCmdBuffers.data());
-}
-
-VkCommandBuffer VulkanExampleBase::createCommandBuffer(VkCommandBufferLevel level, bool begin)
-{
-	VkCommandBuffer cmdBuffer;
-
-	VkCommandBufferAllocateInfo cmdBufAllocateInfo =
-		vks::initializers::commandBufferAllocateInfo(
-			cmdPool,
-			level,
-			1);
-
-	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &cmdBuffer));
-
-	// If requested, also start the new command buffer
-	if (begin)
-	{
-		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
-		VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
-	}
-
-	return cmdBuffer;
-}
-
-void VulkanExampleBase::flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free)
-{
-	if (commandBuffer == VK_NULL_HANDLE)
-	{
-		return;
-	}
-	
-	VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
-
-	VkSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer;
-
-	VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE));
-	VK_CHECK_RESULT(vkQueueWaitIdle(queue));
-
-	if (free)
-	{
-		vkFreeCommandBuffers(device, cmdPool, 1, &commandBuffer);
-	}
-}
 
 void VulkanExampleBase::createPipelineCache()
 {
@@ -200,13 +494,14 @@ void VulkanExampleBase::createPipelineCache()
 
 void VulkanExampleBase::prepare()
 {
-	fprintf(stderr, "VulkanExampleBase::%s ... \r\n", __func__);
+	DLOGD( "VulkanExampleBase::%s ... \r\n", __func__);
 	if (vulkanDevice->enableDebugMarkers) {
 		vks::debugmarker::setup(device);
 	}
 	initSwapchain();
-	createCommandPool();
 	setupSwapChain();
+	createCommandPool();
+	///setupSwapChain();
 	createCommandBuffers();
 	createSynchronizationPrimitives();
 	setupDepthStencil();
@@ -224,68 +519,7 @@ void VulkanExampleBase::prepare()
 		UIOverlay.prepareResources();
 		UIOverlay.preparePipeline(pipelineCache, renderPass);
 	}
-	fprintf(stderr, "VulkanExampleBase::%s done \r\n", __func__);
-}
-
-VkPipelineShaderStageCreateInfo VulkanExampleBase::loadShader(std::string fileName, VkShaderStageFlagBits stage)
-{
-	VkPipelineShaderStageCreateInfo shaderStage = {};
-	shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStage.stage = stage;
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	shaderStage.module = vks::tools::loadShader(androidApp->activity->assetManager, fileName.c_str(), device);
-#else
-	shaderStage.module = vks::tools::loadShader(fileName.c_str(), device);
-#endif
-	shaderStage.pName = "main"; // todo : make param
-	assert(shaderStage.module != VK_NULL_HANDLE);
-	shaderModules.push_back(shaderStage.module);
-	return shaderStage;
-}
-
-void VulkanExampleBase::renderFrame()
-{
-	auto tStart = std::chrono::high_resolution_clock::now();
-	if (viewUpdated)
-	{
-		viewUpdated = false;
-		viewChanged();
-	}
-
-	render();
-	frameCounter++;
-	auto tEnd = std::chrono::high_resolution_clock::now();
-	auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-	frameTimer = (float)tDiff / 1000.0f;
-	camera.update(frameTimer);
-	if (camera.moving())
-	{
-		viewUpdated = true;
-	}
-	// Convert to clamped timer value
-	if (!paused)
-	{
-		timer += timerSpeed * frameTimer;
-		if (timer > 1.0)
-		{
-			timer -= 1.0f;
-		}
-	}
-	float fpsTimer = (float)(std::chrono::duration<double, std::milli>(tEnd - lastTimestamp).count());
-	if (fpsTimer > 1000.0f)
-	{
-		lastFPS = static_cast<uint32_t>((float)frameCounter * (1000.0f / fpsTimer));
-#if defined(_WIN32)
-		if (!settings.overlay)	{
-			std::string windowTitle = getWindowTitle();
-			SetWindowText(window, windowTitle.c_str());
-		}
-#endif
-		frameCounter = 0;
-		lastTimestamp = tEnd;
-	}
-	// TODO: Cap UI overlay update rates
-	updateOverlay();
+	DLOGD( "VulkanExampleBase::%s done \r\n", __func__);
 }
 
 void VulkanExampleBase::renderFrame__android_prepare() {
@@ -378,6 +612,54 @@ void VulkanExampleBase::renderFrame__android() {
 		}
 #endif
 }
+
+#if defined(_WIN32)
+void VulkanExampleBase::renderFrame()
+{
+	auto tStart = std::chrono::high_resolution_clock::now();
+	if (viewUpdated)
+	{
+		viewUpdated = false;
+		viewChanged();
+	}
+
+	render();
+	frameCounter++;
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	auto tDiff = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+	frameTimer = (float)tDiff / 1000.0f;
+	camera.update(frameTimer);
+	if (camera.moving())
+	{
+		viewUpdated = true;
+	}
+	// Convert to clamped timer value
+	if (!paused)
+	{
+		timer += timerSpeed * frameTimer;
+		if (timer > 1.0)
+		{
+			timer -= 1.0f;
+		}
+	}
+	float fpsTimer = (float)(std::chrono::duration<double, std::milli>(tEnd - lastTimestamp).count());
+	if (fpsTimer > 1000.0f)
+	{
+		lastFPS = static_cast<uint32_t>((float)frameCounter * (1000.0f / fpsTimer));
+#if defined(_WIN32)
+		if (!settings.overlay)	{
+			std::string windowTitle = getWindowTitle();
+			SetWindowText(window, windowTitle.c_str());
+		}
+#endif
+		frameCounter = 0;
+		lastTimestamp = tEnd;
+	}
+	// TODO: Cap UI overlay update rates
+	updateOverlay();
+}
+#endif
+
 void VulkanExampleBase::renderLoop()
 {
 	if (benchmark.active) {
@@ -706,6 +988,7 @@ void VulkanExampleBase::updateOverlay()
 	ImGui::Render();
 
 	if (UIOverlay.update() || UIOverlay.updated) {
+		DLOGD( "VulkanExampleBase::%s to call buildCommandBuffers \r\n", __func__);
 		buildCommandBuffers();
 		UIOverlay.updated = false;
 	}
@@ -754,356 +1037,55 @@ void VulkanExampleBase::submitFrame()
 			VK_CHECK_RESULT(result);
 		}
 	}
+/**** frankie, note, here insert wait is not sensible !!! but is a method to debug some function !!! */
 	VK_CHECK_RESULT(vkQueueWaitIdle(queue));
 }
 
-VulkanExampleBase::VulkanExampleBase(bool enableValidation)
+VkPipelineShaderStageCreateInfo VulkanExampleBase::loadShader(std::string fileName, VkShaderStageFlagBits stage)
 {
-	fprintf(stderr, "%s ...\r\n", __func__);
-
-#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
-	// Check for a valid asset path
-	struct stat info;
-	if (stat(getAssetPath().c_str(), &info) != 0)
-	{
-#if defined(_WIN32)
-		std::string msg = "Could not locate asset path in \"" + getAssetPath() + "\" !";
-		MessageBox(NULL, msg.c_str(), "Fatal error", MB_OK | MB_ICONERROR);
+	VkPipelineShaderStageCreateInfo shaderStage = {};
+	shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStage.stage = stage;
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+	shaderStage.module = vks::tools::loadShader(androidApp->activity->assetManager, fileName.c_str(), device);
 #else
-		std::cerr << "Error: Could not find asset path in " << getAssetPath() << std::endl;
+	shaderStage.module = vks::tools::loadShader(fileName.c_str(), device);
 #endif
-		exit(-1);
-	}
-#endif
+	shaderStage.pName = "main"; // todo : make param
+	assert(shaderStage.module != VK_NULL_HANDLE);
+	shaderModules.push_back(shaderStage.module);
+	return shaderStage;
+}
+VkPipelineShaderStageCreateInfo VulkanExampleBase::loadShader_from_strings_c(
+	const char *source_str_, VkShaderStageFlagBits stage) {
+	//DLOGD( "!!! %s,%d \r\n", __func__, __LINE__);
 
-	settings.validation = enableValidation;
+	const std::string s_ = source_str_;
+	return loadShader_from_strings(s_, stage);
+}
+VkPipelineShaderStageCreateInfo VulkanExampleBase::loadShader_from_strings(
+	const std::string &source_, VkShaderStageFlagBits stage) {
+	DLOGD( "!!! %s,%d \r\n", __func__, __LINE__);
 
-	char* numConvPtr;
-
-	// Parse command line arguments
-	for (size_t i = 0; i < args.size(); i++)
-	{
-		if (args[i] == std::string("-validation")) {
-			settings.validation = true;
-		}
-		if (args[i] == std::string("-vsync")) {
-			settings.vsync = true;
-		}
-		if ((args[i] == std::string("-f")) || (args[i] == std::string("--fullscreen"))) {
-			settings.fullscreen = true;
-		}
-		if ((args[i] == std::string("-w")) || (args[i] == std::string("-width"))) {
-			uint32_t w = strtol(args[i + 1], &numConvPtr, 10);
-			if (numConvPtr != args[i + 1]) { width = w; };
-		}
-		if ((args[i] == std::string("-h")) || (args[i] == std::string("-height"))) {
-			uint32_t h = strtol(args[i + 1], &numConvPtr, 10);
-			if (numConvPtr != args[i + 1]) { height = h; };
-		}
-		// Benchmark
-		if ((args[i] == std::string("-b")) || (args[i] == std::string("--benchmark"))) {
-			benchmark.active = true;
-			vks::tools::errorModeSilent = true;
-		}
-		// Warmup time (in seconds)
-		if ((args[i] == std::string("-bw")) || (args[i] == std::string("--benchwarmup"))) {
-			if (args.size() > i + 1) {
-				uint32_t num = strtol(args[i + 1], &numConvPtr, 10);
-				if (numConvPtr != args[i + 1]) {
-					benchmark.warmup = num;
-				} else {
-					std::cerr << "Warmup time for benchmark mode must be specified as a number!" << std::endl;
-				}
-			}
-		}
-		// Benchmark runtime (in seconds)
-		if ((args[i] == std::string("-br")) || (args[i] == std::string("--benchruntime"))) {
-			if (args.size() > i + 1) {
-				uint32_t num = strtol(args[i + 1], &numConvPtr, 10);
-				if (numConvPtr != args[i + 1]) {
-					benchmark.duration = num;
-				}
-				else {
-					std::cerr << "Benchmark run duration must be specified as a number!" << std::endl;
-				}
-			}
-		}
-		// Bench result save filename (overrides default)
-		if ((args[i] == std::string("-bf")) || (args[i] == std::string("--benchfilename"))) {
-			if (args.size() > i + 1) {
-				if (args[i + 1][0] == '-') {
-					std::cerr << "Filename for benchmark results must not start with a hyphen!" << std::endl;
-				} else {
-					benchmark.filename = args[i + 1];
-				}
-			}
-		}
-		// Output frame times to benchmark result file
-		if ((args[i] == std::string("-bt")) || (args[i] == std::string("--benchframetimes"))) {
-			benchmark.outputFrameTimes = true;
-		}
-	}
-	
+	VkPipelineShaderStageCreateInfo shaderStage = {};
+	shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStage.pNext = nullptr,
+	shaderStage.stage = stage;
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	// Vulkan library is loaded dynamically on Android
-	bool libLoaded = vks::android::loadVulkanLibrary();
-	assert(libLoaded);
-#elif defined(_DIRECT2DISPLAY)
-
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-	initWaylandConnection();
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-	initxcbConnection();
+	shaderStage.module = vks::tools::loadShader_from_string(source_, stage, device);
+#else
+	assert(false);
 #endif
+	assert(shaderStage.module != VK_NULL_HANDLE);
+	shaderStage.pSpecializationInfo = nullptr,
+	shaderStage.flags = 0,
+	shaderStage.pName = "main"; // todo : make param
 
-#if defined(_WIN32)
-	// Enable console if validation is active
-	// Debug message callback will output to it
-	if (this->settings.validation)
-	{
-		setupConsole("Vulkan validation output");
-	}
-	setupDPIAwareness();
-#endif
-
-	fprintf(stderr, "%s done \r\n", __func__);
+	shaderModules.push_back(shaderStage.module);
+	return shaderStage;
 }
 
-VulkanExampleBase::~VulkanExampleBase()
-{
-	fprintf(stderr, "%s ... \r\n", __func__);
 
-	// Clean up Vulkan resources
-	swapChain.cleanup();
-	if (descriptorPool != VK_NULL_HANDLE)
-	{
-		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-	}
-	destroyCommandBuffers();
-	vkDestroyRenderPass(device, renderPass, nullptr);
-	for (uint32_t i = 0; i < frameBuffers.size(); i++)
-	{
-		vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
-	}
-
-	for (auto& shaderModule : shaderModules)
-	{
-		vkDestroyShaderModule(device, shaderModule, nullptr);
-	}
-	vkDestroyImageView(device, depthStencil.view, nullptr);
-	vkDestroyImage(device, depthStencil.image, nullptr);
-	vkFreeMemory(device, depthStencil.mem, nullptr);
-
-	vkDestroyPipelineCache(device, pipelineCache, nullptr);
-
-	vkDestroyCommandPool(device, cmdPool, nullptr);
-
-	vkDestroySemaphore(device, semaphores.presentComplete, nullptr);
-	vkDestroySemaphore(device, semaphores.renderComplete, nullptr);
-	for (auto& fence : waitFences) {
-		vkDestroyFence(device, fence, nullptr);
-	}
-
-	if (settings.overlay) {
-		UIOverlay.freeResources();
-	}
-
-	delete vulkanDevice;
-
-	if (settings.validation)
-	{
-		vks::debug::freeDebugCallback(instance);
-	}
-
-	vkDestroyInstance(instance, nullptr);
-
-#if defined(_DIRECT2DISPLAY)
-
-#elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-	xdg_toplevel_destroy(xdg_toplevel);
-	xdg_surface_destroy(xdg_surface);
-	wl_surface_destroy(surface);
-	if (keyboard)
-		wl_keyboard_destroy(keyboard);
-	if (pointer)
-		wl_pointer_destroy(pointer);
-	wl_seat_destroy(seat);
-	xdg_wm_base_destroy(shell);
-	wl_compositor_destroy(compositor);
-	wl_registry_destroy(registry);
-	wl_display_disconnect(display);
-#elif defined(VK_USE_PLATFORM_ANDROID_KHR)
-	// todo : android cleanup (if required)
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
-	xcb_destroy_window(connection, window);
-	xcb_disconnect(connection);
-#endif
-
-	fprintf(stderr, "%s done ! \r\n", __func__);
-}
-
-bool VulkanExampleBase::initVulkan()
-{
-	fprintf(stderr, "%s ... \r\n", __func__);
-	VkResult err;
-
-	// Vulkan instance
-	err = createInstance(settings.validation);
-	if (err) {
-		vks::tools::exitFatal("Could not create Vulkan instance : \n" + vks::tools::errorString(err), err);
-		return false;
-	}
-
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	vks::android::loadVulkanFunctions(instance);
-#endif
-
-	// If requested, we enable the default validation layers for debugging
-	if (settings.validation)
-	{
-		// The report flags determine what type of messages for the layers will be displayed
-		// For validating (debugging) an appplication the error and warning bits should suffice
-		VkDebugReportFlagsEXT debugReportFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-		// Additional flags include performance info, loader and layer debug messages, etc.
-		vks::debug::setupDebugging(instance, debugReportFlags, VK_NULL_HANDLE);
-	}
-
-	// Physical device
-	uint32_t gpuCount = 0;
-	// Get number of available physical devices
-	VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr));
-	assert(gpuCount > 0);
-	// Enumerate devices
-	std::vector<VkPhysicalDevice> physicalDevices(gpuCount);
-	err = vkEnumeratePhysicalDevices(instance, &gpuCount, physicalDevices.data());
-	if (err) {
-		vks::tools::exitFatal("Could not enumerate physical devices : \n" + vks::tools::errorString(err), err);
-		return false;
-	}
-
-	// GPU selection
-
-	// Select physical device to be used for the Vulkan example
-	// Defaults to the first device unless specified by command line
-	uint32_t selectedDevice = 0;
-
-#if !defined(VK_USE_PLATFORM_ANDROID_KHR)	
-	// GPU selection via command line argument
-	for (size_t i = 0; i < args.size(); i++)
-	{
-		// Select GPU
-		if ((args[i] == std::string("-g")) || (args[i] == std::string("-gpu")))
-		{
-			char* endptr;
-			uint32_t index = strtol(args[i + 1], &endptr, 10);
-			if (endptr != args[i + 1]) 
-			{ 
-				if (index > gpuCount - 1)
-				{
-					std::cerr << "Selected device index " << index << " is out of range, reverting to device 0 (use -listgpus to show available Vulkan devices)" << std::endl;
-				} 
-				else
-				{
-					std::cout << "Selected Vulkan device " << index << std::endl;
-					selectedDevice = index;
-				}
-			};
-			break;
-		}
-		// List available GPUs
-		if (args[i] == std::string("-listgpus"))
-		{
-			uint32_t gpuCount = 0;
-			VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr));
-			if (gpuCount == 0) 
-			{
-				std::cerr << "No Vulkan devices found!" << std::endl;
-			}
-			else 
-			{
-				// Enumerate devices
-				std::cout << "Available Vulkan devices" << std::endl;
-				std::vector<VkPhysicalDevice> devices(gpuCount);
-				VK_CHECK_RESULT(vkEnumeratePhysicalDevices(instance, &gpuCount, devices.data()));
-				for (uint32_t i = 0; i < gpuCount; i++) {
-					VkPhysicalDeviceProperties deviceProperties;
-					vkGetPhysicalDeviceProperties(devices[i], &deviceProperties);
-					std::cout << "Device [" << i << "] : " << deviceProperties.deviceName << std::endl;
-					std::cout << " Type: " << vks::tools::physicalDeviceTypeString(deviceProperties.deviceType) << std::endl;
-					std::cout << " API: " << (deviceProperties.apiVersion >> 22) << "." << ((deviceProperties.apiVersion >> 12) & 0x3ff) << "." << (deviceProperties.apiVersion & 0xfff) << std::endl;
-				}
-			}
-		}
-	}
-#endif
-
-	physicalDevice = physicalDevices[selectedDevice];
-
-	// Store properties (including limits), features and memory properties of the phyiscal device (so that examples can check against them)
-	vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-	vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
-	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
-
-	// Derived examples can override this to set actual features (based on above readings) to enable for logical device creation
-	getEnabledFeatures();
-
-	// Vulkan device creation
-	// This is handled by a separate class that gets a logical device representation
-	// and encapsulates functions related to a device
-	vulkanDevice = new vks::VulkanDevice(physicalDevice);
-	VkResult res = vulkanDevice->createLogicalDevice(enabledFeatures, enabledDeviceExtensions, deviceCreatepNextChain);
-	if (res != VK_SUCCESS) {
-		vks::tools::exitFatal("Could not create Vulkan device: \n" + vks::tools::errorString(res), res);
-		return false;
-	}
-	device = vulkanDevice->logicalDevice;
-
-	// Get a graphics queue from the device
-	vkGetDeviceQueue(device, vulkanDevice->queueFamilyIndices.graphics, 0, &queue);
-
-	// Find a suitable depth format
-	VkBool32 validDepthFormat = vks::tools::getSupportedDepthFormat(physicalDevice, &depthFormat);
-	assert(validDepthFormat);
-
-	swapChain.connect(instance, physicalDevice, device);
-
-	// Create synchronization objects
-	VkSemaphoreCreateInfo semaphoreCreateInfo = vks::initializers::semaphoreCreateInfo();
-	// Create a semaphore used to synchronize image presentation
-	// Ensures that the image is displayed before we start submitting new commands to the queu
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.presentComplete));
-	// Create a semaphore used to synchronize command submission
-	// Ensures that the image is not presented until all commands have been sumbitted and executed
-	VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &semaphores.renderComplete));
-
-	// Set up submit info structure
-	// Semaphores will stay the same during application lifetime
-	// Command buffer submission info is set by each example
-	submitInfo = vks::initializers::submitInfo();
-	submitInfo.pWaitDstStageMask = &submitPipelineStages;
-	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = &semaphores.presentComplete;
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = &semaphores.renderComplete;
-
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	// Get Android device name and manufacturer (to display along GPU name)
-	androidProduct = "";
-	char prop[PROP_VALUE_MAX+1];
-	int len = __system_property_get("ro.product.manufacturer", prop);
-	if (len > 0) {
-		androidProduct += std::string(prop) + " ";
-	};
-	len = __system_property_get("ro.product.model", prop);
-	if (len > 0) {
-		androidProduct += std::string(prop);
-	};
-	LOGD("androidProduct = %s", androidProduct.c_str());
-#endif	
-
-	fprintf(stderr, "%s done \r\n", __func__);
-	return true;
-}
 
 #if defined(_WIN32)
 // Win32 : Sets up a console window and redirects standard output to it
@@ -1238,7 +1220,7 @@ HWND VulkanExampleBase::setupWindow(HINSTANCE hinstance, WNDPROC wndproc)
 
 	if (!window)
 	{
-		printf("Could not create window!\n");
+		DLOGD("Could not create window!\n");
 		fflush(stdout);
 		return nullptr;
 		exit(1);
@@ -1974,7 +1956,7 @@ void VulkanExampleBase::initxcbConnection()
 
 	connection = xcb_connect(NULL, &scr);
 	if (connection == NULL) {
-		printf("Could not find a compatible Vulkan ICD!\n");
+		DLOGD("Could not find a compatible Vulkan ICD!\n");
 		fflush(stdout);
 		exit(1);
 	}
@@ -2110,6 +2092,13 @@ void VulkanExampleBase::buildCommandBuffers() {}
 
 void VulkanExampleBase::createSynchronizationPrimitives()
 {
+#if 1  // frankie, add
+	mSwapChainSemaphores.resize(drawCmdBuffers.size());
+	for (auto& semaphores__ : mSwapChainSemaphores) {
+		semaphores__.presentComplete = VK_NULL_HANDLE;
+		semaphores__.renderComplete = VK_NULL_HANDLE;
+	}
+#endif
 	// Wait fences to sync command buffer access
 	VkFenceCreateInfo fenceCreateInfo = vks::initializers::fenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
 	waitFences.resize(drawCmdBuffers.size());
@@ -2118,14 +2107,6 @@ void VulkanExampleBase::createSynchronizationPrimitives()
 	}
 }
 
-void VulkanExampleBase::createCommandPool()
-{
-	VkCommandPoolCreateInfo cmdPoolInfo = {};
-	cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	cmdPoolInfo.queueFamilyIndex = swapChain.queueNodeIndex;
-	cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &cmdPool));
-}
 
 void VulkanExampleBase::setupDepthStencil()
 {
@@ -2273,6 +2254,9 @@ void VulkanExampleBase::getEnabledFeatures()
 
 void VulkanExampleBase::windowResize()
 {
+	DLOGD( "***************** warning %s ****************** \r\n", __func__);
+	DLOGD( "***************** warning %s ****************** \r\n", __func__);
+	DLOGD( "***************** warning %s ****************** \r\n", __func__);
 	if (!prepared)
 	{
 		return;
@@ -2385,6 +2369,92 @@ void VulkanExampleBase::initSwapchain()
 void VulkanExampleBase::setupSwapChain()
 {
 	swapChain.create(&width, &height, settings.vsync);
+}
+
+void VulkanExampleBase::createCommandPool()
+{
+	VkCommandPoolCreateInfo cmdPoolInfo = {};
+	cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	cmdPoolInfo.queueFamilyIndex = swapChain.queueNodeIndex;  // frankie, currently this index must be equal to 
+																		// "vulkanDevice->queueFamilyIndices.graphics"
+	cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	VK_CHECK_RESULT(vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &cmdPool));
+}
+
+bool VulkanExampleBase::checkCommandBuffers()
+{
+	for (auto& cmdBuffer : drawCmdBuffers)
+	{
+		if (cmdBuffer == VK_NULL_HANDLE)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void VulkanExampleBase::createCommandBuffers()
+{
+	// Create one command buffer for each swap chain image and reuse for rendering
+	drawCmdBuffers.resize(swapChain.imageCount);
+
+	VkCommandBufferAllocateInfo cmdBufAllocateInfo =
+		vks::initializers::commandBufferAllocateInfo(
+			cmdPool,
+			VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			static_cast<uint32_t>(drawCmdBuffers.size()));
+
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, drawCmdBuffers.data()));
+}
+
+void VulkanExampleBase::destroyCommandBuffers()
+{
+	vkFreeCommandBuffers(device, cmdPool, static_cast<uint32_t>(drawCmdBuffers.size()), drawCmdBuffers.data());
+}
+
+VkCommandBuffer VulkanExampleBase::createCommandBuffer(VkCommandBufferLevel level, bool begin)
+{
+	VkCommandBuffer cmdBuffer;
+
+	VkCommandBufferAllocateInfo cmdBufAllocateInfo =
+		vks::initializers::commandBufferAllocateInfo(
+			cmdPool,
+			level,
+			1);
+
+	VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &cmdBufAllocateInfo, &cmdBuffer));
+
+	// If requested, also start the new command buffer
+	if (begin)
+	{
+		VkCommandBufferBeginInfo cmdBufInfo = vks::initializers::commandBufferBeginInfo();
+		VK_CHECK_RESULT(vkBeginCommandBuffer(cmdBuffer, &cmdBufInfo));
+	}
+
+	return cmdBuffer;
+}
+
+void VulkanExampleBase::flushCommandBuffer(VkCommandBuffer commandBuffer, VkQueue queue, bool free, VkFence fence_)
+{
+	if (commandBuffer == VK_NULL_HANDLE)
+	{
+		return;
+	}
+	
+	VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence_));
+	VK_CHECK_RESULT(vkQueueWaitIdle(queue));
+
+	if (free)
+	{
+		vkFreeCommandBuffers(device, cmdPool, 1, &commandBuffer);
+	}
 }
 
 void VulkanExampleBase::OnUpdateUIOverlay(vks::UIOverlay *overlay) {}

@@ -1,0 +1,3 @@
+
+INTERFACE_r(1, on_receiver, int32_t, -1, (input_, output_), const std::vector<std::string>& input_, std::vector<std::string>& output_);
+

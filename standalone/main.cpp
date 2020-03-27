@@ -15,19 +15,18 @@
 #include <media/NdkImageReader.h>
 #include <unistd.h>
 
+#include "FootballConfig.h"
+
 #include "native_app_glue.h"
 
 #include "StbImageUtils.h"
 
 #include "ImageReaderHolder.h"
 
-#include "ndk_extend/NativeHooApi.h"
+#include "ndk_extend/NativeHooApi_Loader.h"
 
 #define kTAG_ "native_app_main"
 
-
-#define TEST_WIDTH (1080)
-#define TEST_HEIGHT (1920)
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -48,7 +47,7 @@ public:
 
 		{
 
-			fprintf(stderr, ">>> %s ... \r\n", __func__);
+			DLOGD( ">>> %s ... \r\n", __func__);
 			// saving as png
 			int32_t w,h,f;
 			AImage_getWidth(image_, &w);
@@ -64,7 +63,7 @@ public:
 			/*out*/int dataLength = 0;
 			AImage_getPlaneData(image_, 0, &data, &dataLength);
 
-			fprintf(stderr, "%s size:%4dx%4d f:0x%08x num:%d pixelStride:%d rowStride:%d dataLength:%d \r\n",
+			DLOGD( "%s size:%4dx%4d f:0x%08x num:%d pixelStride:%d rowStride:%d dataLength:%d \r\n",
 				__func__, w, h, f, numPlanes, pixelStride, rowStride, dataLength);
 
 #if 0
@@ -75,7 +74,7 @@ public:
 				int n = 4;
 				vk___stbi_write_png(path_, w, h, n, data, rowStride);
 
-				fprintf(stderr, "saving done! \r\n");
+				DLOGD( "saving done! \r\n");
 			}
 #endif
 			__reader_cb_num++;
@@ -86,6 +85,9 @@ public:
 };
 
 
+#define TEST_WIDTH (1080)
+#define TEST_HEIGHT (1920)
+
 #define RENDER_INTO_SURFACE_EN (1)
 
 #define TEST_TIMES_WINDOW 1 // (10000)
@@ -94,7 +96,7 @@ public:
 //int main(int argc, char *argv[]) 
 int main(PFN_android_main_ pfunc_main_, int cycle_num, int wait_ms) 
 {
-    printf("Hello,world! \r\n");
+    DLOGD("Hello,world! \r\n");
 
 
     ANativeActivityCallbacks _callbacks = {NULL};
@@ -105,7 +107,7 @@ int main(PFN_android_main_ pfunc_main_, int cycle_num, int wait_ms)
 		//TEST_TIMES_WINDOW
 		cycle_num
 		;i++) {
-		fprintf(stderr, "############################################ cycle : %d \r\n", i);
+		DLOGD( "############################################ cycle : %d \r\n", i);
 
         ImageReaderHolder *aWindowHolder = nullptr;
 		ANativeWindow *aNativeWindow = nullptr;
@@ -116,9 +118,9 @@ int main(PFN_android_main_ pfunc_main_, int cycle_num, int wait_ms)
 	#if RENDER_INTO_SURFACE_EN
 		{
 			int ret = 0;
-			ret = ANativeHooSurface_create("", TEST_WIDTH, TEST_HEIGHT, 0x01, 0, &hooSurface);
+			ret = ANativeHooSurface_create("", TEST_WIDTH, TEST_HEIGHT, AIMAGE_FORMAT_RGBA_8888, 0, &hooSurface);
 			if (ret == 0 && hooSurface != nullptr) {
-				fprintf(stderr, "create surface ok . \r\n");
+				DLOGD( "create surface ok . \r\n");
 				ANativeWindow *inputWindow = nullptr;
 				ANativeHooSurface_getWindow(hooSurface, &inputWindow);
 				if (inputWindow != nullptr) {
@@ -149,16 +151,16 @@ int main(PFN_android_main_ pfunc_main_, int cycle_num, int wait_ms)
 
 	        pNativeActivity->obbPath = "/sdcard/data/";
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        ANativeActivity_onCreate_(pNativeActivity, NULL, 0, pfunc_main_);		// start app thread
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        pNativeActivity->callbacks->onInputQueueCreated(pNativeActivity, NULL);
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        pNativeActivity->callbacks->onNativeWindowCreated(pNativeActivity, aNativeWindow);  // init window
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        pNativeActivity->callbacks->onStart(pNativeActivity);
 	        pNativeActivity->callbacks->onResume(pNativeActivity);
 
@@ -186,7 +188,7 @@ int main(PFN_android_main_ pfunc_main_, int cycle_num, int wait_ms)
 		
 		#endif
 
-			fprintf(stderr, "*** wait %d milli-seconds ! \r\n", wait_ms);
+			DLOGD( "*** wait %d milli-seconds ! \r\n", wait_ms);
 			usleep(wait_ms * 1000);
 		#if 1
 			//usleep(5 * 1000 * 1000);
@@ -198,25 +200,25 @@ int main(PFN_android_main_ pfunc_main_, int cycle_num, int wait_ms)
 	        focused = 0;
 	        pNativeActivity->callbacks->onWindowFocusChanged(pNativeActivity, focused);
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        pNativeActivity->callbacks->onPause(pNativeActivity);
 	        pNativeActivity->callbacks->onStop(pNativeActivity);
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        size_t outLen = 0;
 	        pNativeActivity->callbacks->onSaveInstanceState(pNativeActivity, &outLen);
 	        pNativeActivity->callbacks->onLowMemory(pNativeActivity);
 	        pNativeActivity->callbacks->onConfigurationChanged(pNativeActivity);
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        pNativeActivity->callbacks->onNativeWindowDestroyed(pNativeActivity, NULL);  // term window
 
 	        pNativeActivity->callbacks->onInputQueueDestroyed(pNativeActivity, NULL);
 
-	        fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+	        DLOGD( "%s,%d \r\n", __func__, __LINE__);
 	        pNativeActivity->callbacks->onDestroy(pNativeActivity);
 
-			fprintf(stderr, "*** %s, window test:%d , vulkan test:%d \r\n", __func__, i, j);
+			DLOGD( "*** %s, window test:%d , vulkan test:%d \r\n", __func__, i, j);
 
 		}
 
@@ -231,7 +233,7 @@ int main(PFN_android_main_ pfunc_main_, int cycle_num, int wait_ms)
         
     }
 
-    fprintf(stderr, "%s,%d \r\n", __func__, __LINE__);
+    DLOGD( "%s,%d \r\n", __func__, __LINE__);
     return 0;
 }
 /*

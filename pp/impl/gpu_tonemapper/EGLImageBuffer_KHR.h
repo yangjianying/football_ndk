@@ -17,20 +17,17 @@
  * limitations under the License.
  */
 
-#ifndef __EGLIMAGE_BUFFER_H__
-#define __EGLIMAGE_BUFFER_H__
+#ifndef __EGLIMAGE_BUFFER_KHR_H__
+#define __EGLIMAGE_BUFFER_KHR_H__
 
 #include <android/native_window.h>  // ANativeWindow, ANativeWindow_Buffer
 #include <android/hardware_buffer.h>
 
-//#include <cutils/native_handle.h>
-//#include <gralloc_priv.h>
-//#include <ui/GraphicBuffer.h>
 
 #include "engine.h"
 
 class EGLImageBuffer_KHR_ {
-  // android::sp<android::GraphicBuffer> graphicBuffer;
+
   void *eglImageID;
   int width;
   int height;

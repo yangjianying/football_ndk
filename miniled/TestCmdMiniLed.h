@@ -19,14 +19,15 @@ public:
 	CL_DEF_FUNC(pon);
 	CL_DEF_FUNC(poff);
 	CL_DEF_FUNC(init);
+	CL_DEF_FUNC(w);
+	CL_DEF_FUNC(r);
+	CL_DEF_FUNC(bl);
+	CL_DEF_FUNC(vsync);
+
 	CL_DEF_FUNC(test1);
 	CL_DEF_FUNC(test2);
 	CL_DEF_FUNC(test3);
 	CL_DEF_FUNC(test4);
-	CL_DEF_FUNC(w);
-	CL_DEF_FUNC(r);
-	CL_DEF_FUNC(bl);
-
 
 	TestCmdMiniLed(uint32_t flags);
 	virtual ~TestCmdMiniLed();
@@ -53,6 +54,7 @@ public:
 	uint16_t mDataBuffer[DATA_BUFFER_SIZE] = {0};
 	uint32_t mDataNum = 0;
 
+	static int _main(int argc, char **argv);
 };
 
 

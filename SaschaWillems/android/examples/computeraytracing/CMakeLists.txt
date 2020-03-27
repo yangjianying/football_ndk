@@ -15,6 +15,7 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -u ANativeActivity_o
 add_library(computeraytracing_static STATIC ${EXAMPLE_SRC})
 
 target_include_directories(computeraytracing_static PRIVATE 
+	${REPO_ROOT_DIR}
 	.
 	${SRC_dir_app_standalone}
 	${BASE_DIR}

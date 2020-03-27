@@ -1,4 +1,8 @@
+#include "FootballConfig.h"
 
+
+#undef __CLASS__
+#define __CLASS__ "standalone_main"
 
 #define main standalone_main
 #include "main.cpp"
@@ -25,7 +29,7 @@ static PFN_android_main_ android_main_funcs[] = {
 #define android_main_funcs_SIZE (sizeof(android_main_funcs)/sizeof(android_main_funcs[0]))
 
 void standalone_main_run_all() {
-	fprintf(stderr, "%s, android_main_funcs_SIZE:%d \r\n", __func__, (int)android_main_funcs_SIZE);
+	DLOGD( "%s, android_main_funcs_SIZE:%d \r\n", __func__, (int)android_main_funcs_SIZE);
 	for(int i=0;i<android_main_funcs_SIZE;i++) {
 		standalone_main(android_main_funcs[i], 1, 5000);
 	}
